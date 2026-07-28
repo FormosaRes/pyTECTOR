@@ -382,6 +382,24 @@ class Main(QtWidgets.QMainWindow):
             'reproduces that historical run. Only available when the site '
             'came with an INFO1.')
         tb.addWidget(self.cb_lam)
+        lab = QtWidgets.QLabel('  decl ')
+        lab.setStyleSheet('color:%s;' % MUTED)
+        lab.setToolTip('magnetic declination')
+        tb.addWidget(lab)
+        self.ed_decl = QtWidgets.QLineEdit()
+        self.ed_decl.setObjectName('seg')
+        self.ed_decl.setFixedWidth(52)
+        self.ed_decl.setAlignment(QtCore.Qt.AlignCenter)
+        self.ed_decl.setMaxLength(6)
+        self.ed_decl.setText('%.2f' % plot.MAGNETIC_OFFSET)
+        self.ed_decl.setToolTip(
+            'Where the M mark is drawn, in degrees east of geographic north. '
+            'The archive draws it at a fixed 1.95. This moves the mark only; '
+            'it does NOT rotate the data, so results never change behind your '
+            'back.')
+        self.ed_decl.textEdited.connect(lambda _t: self._draw())
+        tb.addWidget(self.ed_decl)
+
         tb.addSeparator()
         self.btn_run = QtWidgets.QPushButton('INVERT')
         self.btn_run.setObjectName('run')
@@ -453,14 +471,15 @@ class Main(QtWidgets.QMainWindow):
         self.cmb_ptype = QtWidgets.QComboBox()
         self.cmb_ptype.addItems(['plane', 'pole'])
         self.cmb_ptype.setFixedWidth(64)
+        self.cmb_ptype.currentIndexChanged.connect(self._ptype_changed)
         row.addWidget(self.cmb_ptype)
         self.pl_fields = []
-        for hint in ('212', '87'):
+        for _ in range(2):
             e = QtWidgets.QLineEdit()
             e.setObjectName('seg')
-            e.setFixedWidth(52)
+            e.setFixedWidth(54)
+            e.setMaxLength(4)
             e.setAlignment(QtCore.Qt.AlignCenter)
-            e.setPlaceholderText(hint)
             e.returnPressed.connect(self.add_plane)
             self.pl_fields.append(e)
             row.addWidget(e)
@@ -477,6 +496,7 @@ class Main(QtWidgets.QMainWindow):
             'It is then drawn with a longer dash.')
         self.list_planes.itemDoubleClicked.connect(self._star_plane)
         v.addWidget(self.list_planes)
+        self._ptype_changed()
 
         row = QtWidgets.QHBoxLayout()
         row.setSpacing(3)
@@ -632,28 +652,45 @@ class Main(QtWidgets.QMainWindow):
         return split
 
     # -------------------------------------------------- reference planes --
+    def _ptype_changed(self, *_a):
+        """Planes are entered as strike and dip with a quadrant, the same
+        convention as the fault records. Poles as trend and plunge."""
+        plane = self.cmb_ptype.currentText() == 'plane'
+        hints = ('122', '87W') if plane else ('045', '12')
+        tips = (('strike, 000 to 360', 'dip and its quadrant, e.g. 87W')
+                if plane else ('pole trend', 'pole plunge'))
+        for e, h, t in zip(self.pl_fields, hints, tips):
+            e.setPlaceholderText(h)
+            e.setToolTip(t)
+
     def add_plane(self):
-        """A surface, given either as a plane or by its pole. Any number may
+        """A surface, given as strike and dip or by its pole. Any number may
         be entered; one of them can drive the back-tilt."""
-        vals = []
-        for e in self.pl_fields:
-            try:
-                vals.append(float(e.text().strip()))
-            except ValueError:
-                QtWidgets.QMessageBox.warning(
-                    self, 'pyTENSOR', 'Two numbers are needed.')
-                return
-        kind = self.cmb_ptype.currentText()
-        if kind == 'plane':
-            dipaz, dip = vals[0] % 360.0, vals[1]
-        else:                                   # a pole names its own plane
-            dipaz, dip = (vals[0] + 180.0) % 360.0, 90.0 - vals[1]
-        if not 0 <= dip <= 90:
-            QtWidgets.QMessageBox.warning(
-                self, 'pyTENSOR', 'That gives a dip of %.0f degrees.' % dip)
+        txt = [e.text().strip() for e in self.pl_fields]
+        if not all(txt):
             return
-        self.planes.append(dict(kind=kind, a=vals[0], b=vals[1],
-                                dipaz=dipaz, dip=dip,
+        kind = self.cmb_ptype.currentText()
+        try:
+            if kind == 'plane':
+                if not txt[0].isdigit():
+                    raise entry.RecordError('strike: "%s"' % txt[0])
+                strike = int(txt[0]) % 360
+                dip, quad = entry._split_num_quad(txt[1], 'dip')
+                if not 0 <= dip <= 90:
+                    raise entry.RecordError('dip must be 0-90')
+                dipaz = entry.dip_azimuth(strike, quad)
+                a, b = float(strike), txt[1].upper()
+            else:                               # a pole names its own plane
+                trend, plunge = float(txt[0]) % 360.0, float(txt[1])
+                if not 0 <= plunge <= 90:
+                    raise entry.RecordError('plunge must be 0-90')
+                dipaz, dip = (trend + 180.0) % 360.0, 90.0 - plunge
+                a, b = trend, plunge
+        except (entry.RecordError, ValueError) as exc:
+            QtWidgets.QMessageBox.warning(self, 'pyTENSOR', str(exc))
+            return
+
+        self.planes.append(dict(kind=kind, a=a, b=b, dipaz=dipaz, dip=dip,
                                 ref=not any(p['ref'] for p in self.planes)))
         for e in self.pl_fields:
             e.clear()
@@ -681,9 +718,13 @@ class Main(QtWidgets.QMainWindow):
         self.list_planes.clear()
         for p in self.planes:
             mark = '*' if p['ref'] else ' '
+            if p['kind'] == 'plane':
+                shown = '%03.0f %s' % (p['a'], p['b'])
+            else:
+                shown = '%03.0f / %02.0f' % (p['a'], p['b'])
             self.list_planes.addItem(
-                '%s %-5s %03.0f / %02.0f   -> plane %03.0f/%02.0f'
-                % (mark, p['kind'], p['a'], p['b'], p['dipaz'], p['dip']))
+                '%s %-5s %-9s   dip az %03.0f / %02.0f'
+                % (mark, p['kind'], shown, p['dipaz'], p['dip']))
         self._bt_changed()
 
     def ref_plane(self):
@@ -1165,6 +1206,10 @@ class Main(QtWidgets.QMainWindow):
         if self.rot:
             t, p, a = self.rot
             rot_tag = '  %03.0f/%02.0f %+.0f' % (t, p, a)
+        try:
+            decl = float(self.ed_decl.text().strip())
+        except ValueError:
+            decl = plot.MAGNETIC_OFFSET
 
         if not keys:
             ax = cell()
@@ -1175,6 +1220,7 @@ class Main(QtWidgets.QMainWindow):
                 None, certainty=conf, sides=sides,
                 site_code=self.plot_name if show_rotated else self.site_name,
                 reference=self.reference_now(show_rotated),
+                declination=decl,
                 header=('BACK-TILTED' + rot_tag) if show_rotated
                 else ('AS MEASURED  no rotation' if self.rot
                       else (retro.translate('observed')
@@ -1187,7 +1233,7 @@ class Main(QtWidgets.QMainWindow):
                                certainty=conf, sides=sides,
                                site_code=self.site_name,
                                reference=self.reference_now(False),
-                               header='AS MEASURED  no rotation')
+                               header='AS MEASURED  no rotation', declination=decl)
                 if annotate:
                     plot.annotate_result(ax, self.results['RAW'],
                                          n_data=len(self.active))
@@ -1198,6 +1244,7 @@ class Main(QtWidgets.QMainWindow):
                     plot.plot_site(ax, n, s, r, certainty=conf, sides=sides,
                                    site_code=self.plot_name,
                                    reference=self.reference_now(True),
+                                   declination=decl,
                                    header=(('BACK-TILTED' + rot_tag + '   '
                                             + NAME[k]) if self.rot
                                            else NAME[k]))
@@ -1207,7 +1254,7 @@ class Main(QtWidgets.QMainWindow):
                     ax = cell()
                     plot.plot_fitted(ax, n, self.results[keys[0]]['T'],
                                      site_code=self.plot_name,
-                                     header='fitted shear')
+                                     header='fitted shear', declination=decl)
         self.fig.subplots_adjust(left=0.01, right=0.99, top=0.99,
                                  bottom=0.14 if annotate else 0.06,
                                  wspace=0.02)

@@ -65,6 +65,56 @@ def _solve_at_psi(n, s, psi, lam):
     return C + p[0] * _P + p[1] * _Q + p[2] * _R, const + float(g @ p), p
 
 
+def _refine(scan, lo, hi, rounds=7, pts=33):
+    """Locate the minimum inside a bracket, calling `scan` on whole grids.
+
+    Replaces a 120-step ternary search that evaluated one psi at a time. Each
+    round shrinks the bracket by 16, so seven rounds take a 4000-point scan
+    step down to about 1e-14 radians, which is the floating-point floor for an
+    angle of this size. The point is that all 33 probes go out in one call.
+    """
+    for _ in range(rounds):
+        grid = np.linspace(lo, hi, pts)
+        j = int(np.argmin(scan(grid)))
+        lo, hi = grid[max(j - 1, 0)], grid[min(j + 1, pts - 1)]
+    return 0.5 * (lo + hi)
+
+
+def _scan_invdir(n, s, psis, lam):
+    """S4 at every psi at once. Same numbers as calling _solve_at_psi in a
+    loop, which is what this replaced.
+
+    Worth the algebra: the scan is 4000 points and it re-runs for every trial
+    lambda, so the archive-LAMBDA search alone was calling the scalar routine
+    about a hundred thousand times and taking the best part of ten seconds.
+    Almost none of that work depends on psi.
+
+    With T = C(psi) + alpha P + beta Q + gamma R, only the diagonal C carries
+    psi and it enters linearly. So M, b, f and the 3x3 normal matrix A are
+    constants of the data set, built once; each psi then costs one right-hand
+    side solved against that SAME matrix.
+    """
+    psis = np.asarray(psis, float)
+    cd = np.cos(psis[:, None] + np.array([0.0, 2 * np.pi / 3, 4 * np.pi / 3]))
+
+    M = np.stack([n @ _P.T, n @ _Q.T, n @ _R.T], axis=2)      # (K,3,3)
+    b = np.einsum('ki,kij->kj', n, M)                          # (K,3)
+    f = np.einsum('ki,kij->kj', s, M)                          # (K,3)
+    A = (np.einsum('kij,kil->kjl', M, M)
+         - np.einsum('ki,kj->kij', b, b)).sum(0)               # (3,3)
+    W = np.einsum('kij,ki->ij', M, n)                          # (3,3)
+
+    n2 = n ** 2
+    a = n2 @ cd.T                                              # (K,P)
+    g = cd @ W - a.T @ b - lam * f.sum(0)                      # (P,3)
+    const = (len(n) * lam ** 2
+             + (cd ** 2) @ n2.sum(0)
+             - (a ** 2).sum(0)
+             - 2 * lam * (cd @ (s * n).sum(0)))
+    p = -np.linalg.solve(A, g.T).T                             # (P,3)
+    return const + np.einsum('pj,pj->p', g, p)
+
+
 def invdir_pass(n, s, lam, n_psi=4000):
     """One INVDIR determination at a given lambda.
 
@@ -72,18 +122,11 @@ def invdir_pass(n, s, lam, n_psi=4000):
     answers; the minimum frequently sits near psi = 330-355 deg.
     """
     psis = np.linspace(0.0, 2 * np.pi, n_psi, endpoint=False)
-    vals = np.fromiter((_solve_at_psi(n, s, p, lam)[1] for p in psis),
-                       float, n_psi)
+    vals = _scan_invdir(n, s, psis, lam)
     i = int(np.argmin(vals))
     step = 2 * np.pi / n_psi
-    lo, hi = psis[i] - step, psis[i] + step
-    for _ in range(120):                                   # ternary search
-        m1, m2 = lo + (hi - lo) / 3, hi - (hi - lo) / 3
-        if _solve_at_psi(n, s, m1, lam)[1] < _solve_at_psi(n, s, m2, lam)[1]:
-            hi = m2
-        else:
-            lo = m1
-    psi = 0.5 * (lo + hi)
+    psi = _refine(lambda g: _scan_invdir(n, s, g, lam),
+                  psis[i] - step, psis[i] + step)
     T, s4, p = _solve_at_psi(n, s, psi, lam)
     return T, s4, psi, p
 
@@ -100,27 +143,28 @@ def psidir(n, s, R, n_psi=8000):
     i.e. to repair artificial permutations of sigma1/sigma2/sigma3 that the
     unnormalised INVDIR pass can produce on poorly varied data sets.
     """
-    def obj(psi):
-        T = tensor_A16(psi, R)
-        sig = n @ T.T
-        sn = np.einsum('ki,ki->k', n, sig)
-        tau = sig - sn[:, None] * n
-        return float(np.sum(LAMBDA ** 2 + np.einsum('ki,ki->k', tau, tau)
-                            - 2 * LAMBDA * np.einsum('ki,ki->k', s, sig)))
+    # In the eigenframe the tensor is diagonal, so with u = R'n and v = R's
+    #   n.sigma = sum u_i^2 d_i,  |sigma|^2 = sum u_i^2 d_i^2,  s.sigma = sum
+    #   v_i u_i d_i,  and |tau|^2 = |sigma|^2 - (n.sigma)^2.
+    # Every psi is then three dot products against d = cos(psi + 0, 2pi/3,
+    # 4pi/3), so the whole 8000-point scan is a couple of matrix products.
+    U = (n @ R) ** 2
+    V = (s @ R) * (n @ R)
+    Us, Vs = U.sum(0), V.sum(0)
+    base = len(n) * LAMBDA ** 2
+
+    def scan(psis):
+        psis = np.asarray(psis, float)
+        d = np.cos(psis[:, None] + np.array([0.0, 2 * np.pi / 3,
+                                             4 * np.pi / 3]))
+        return (base + (d ** 2) @ Us - ((U @ d.T) ** 2).sum(0)
+                - 2 * LAMBDA * (d @ Vs))
 
     psis = np.linspace(0.0, 2 * np.pi, n_psi, endpoint=False)
-    vals = np.fromiter((obj(p) for p in psis), float, n_psi)
-    i = int(np.argmin(vals))
+    i = int(np.argmin(scan(psis)))
     step = 2 * np.pi / n_psi
-    lo, hi = psis[i] - step, psis[i] + step
-    for _ in range(120):
-        m1, m2 = lo + (hi - lo) / 3, hi - (hi - lo) / 3
-        if obj(m1) < obj(m2):
-            hi = m2
-        else:
-            lo = m1
-    psi = 0.5 * (lo + hi)
-    return tensor_A16(psi, R), obj(psi), psi
+    psi = _refine(scan, psis[i] - step, psis[i] + step)
+    return tensor_A16(psi, R), float(scan([psi])[0]), psi
 
 
 def printed_lambda(n, s, lam, n_psi=4000):

@@ -39,15 +39,23 @@ def run(n, s, n_starts=400, seed=0, refine=2):
     rng = np.random.default_rng(seed)
     rots = Rotation.random(n_starts, random_state=rng).as_rotvec()
     psis = np.linspace(0.0, 2 * np.pi, 12, endpoint=False)
-    starts = [(r[0], r[1], r[2], p) for r in rots for p in psis]
 
-    best_x, best_v = None, np.inf
-    for x0 in starts:
-        v = _obj(x0, n, s)
-        if v < best_v:
-            best_x, best_v = x0, v
+    # Score all n_starts x 12 candidates at once rather than one at a time.
+    # In each candidate's own eigenframe the tensor is diagonal, so with
+    # u = R'n and v = R's the objective is three dot products against
+    # d = cos(psi + 0, 2pi/3, 4pi/3), and |tau|^2 = |sigma|^2 - (n.sigma)^2.
+    Rm = Rotation.from_rotvec(rots).as_matrix()               # (M,3,3)
+    u = np.einsum('ki,mij->mkj', n, Rm)
+    v = np.einsum('ki,mij->mkj', s, Rm)
+    U, V = u ** 2, v * u
+    d = np.cos(psis[:, None] + np.array([0.0, 2 * np.pi / 3, 4 * np.pi / 3]))
+    grid = (len(n) * LAMBDA ** 2
+            + U.sum(1) @ (d ** 2).T
+            - (np.einsum('mki,pi->mkp', U, d) ** 2).sum(1)
+            - 2 * LAMBDA * (V.sum(1) @ d.T))                  # (M,P)
 
-    x = np.asarray(best_x, float)
+    i, j = np.unravel_index(int(np.argmin(grid)), grid.shape)
+    x = np.array([rots[i][0], rots[i][1], rots[i][2], psis[j]], float)
     for tol in [1e-11, 1e-13][:refine]:
         x = minimize(_obj, x, args=(n, s), method='Nelder-Mead',
                      options={'xatol': tol, 'fatol': tol * 1e-2,

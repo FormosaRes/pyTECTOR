@@ -780,13 +780,20 @@ class Main(QtWidgets.QMainWindow):
         want_fit = bool(keys) and self.cb_fit.isChecked()
         panels = max(len(keys) + (1 if want_fit else 0), 1)
 
+        for ax in self.fig.get_axes():
+            ax.set_facecolor(plot.PAPER)
+
         if not keys:
             ax = self.fig.add_subplot(111)
+            ax.set_facecolor(plot.PAPER)
             plot.plot_site(ax, n, s, None, certainty=conf, sides=sides,
-                           site_code=self.plot_name, header='observed')
+                           site_code=self.plot_name,
+                           header=retro.translate('observed')
+                           if getattr(self, 'retro', False) else 'observed')
         else:
             for i, k in enumerate(keys):
                 ax = self.fig.add_subplot(1, panels, i + 1)
+                ax.set_facecolor(plot.PAPER)
                 r = self.results[k]
                 plot.plot_site(ax, n, s, r, certainty=conf, sides=sides,
                                site_code=self.plot_name, header=NAME[k])
@@ -794,6 +801,7 @@ class Main(QtWidgets.QMainWindow):
                     plot.annotate_result(ax, r, n_data=len(self.records))
             if want_fit:
                 ax = self.fig.add_subplot(1, panels, panels)
+                ax.set_facecolor(plot.PAPER)
                 plot.plot_fitted(ax, n, self.results[keys[0]]['T'],
                                  site_code=self.plot_name,
                                  header='fitted shear')
@@ -846,6 +854,14 @@ class Main(QtWidgets.QMainWindow):
         app = QtWidgets.QApplication.instance()
         app.setStyleSheet(retro.QSS if self.retro else QSS)
         self.setWindowTitle(retro.TITLE if self.retro else 'pyTENSOR')
+
+        # phosphor green on black for the stereogram
+        if self.retro:
+            plot.set_palette(retro.PLOT_PEN, retro.PLOT_PAPER)
+            self.fig.set_facecolor(retro.PLOT_PAPER)
+        else:
+            plot.set_palette()
+            self.fig.set_facecolor('white')
 
         for w in self.findChildren(QtWidgets.QLabel):
             if w.objectName() == 'heading':

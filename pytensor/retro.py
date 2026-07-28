@@ -34,6 +34,11 @@ SHADOW = '#545454'
 
 MONO = 'Consolas'       # stands in for a bitmap console face
 
+#: the stereogram goes phosphor green on black, like the monitor it would have
+#: been drawn on before it reached the plotter
+PLOT_PEN = '#3BF23B'
+PLOT_PAPER = '#000000'
+
 #: label -> (French, provenance)
 VOCAB = {
     'SITE': ('SITE', 'ORIGINAL'),
@@ -74,6 +79,13 @@ QMainWindow, QWidget {{
     font-family: "{MONO}";
     font-size: 13px;
 }}
+/* A background on QWidget cascades into every QLabel, QCheckBox and
+   QToolButton, so each one ends up carrying a blue rectangle. On the light
+   theme that was invisible because it matched the panels; here it turns the
+   text unreadable. Everything that only needs to paint text is forced
+   transparent. */
+QLabel, QCheckBox, QToolButton {{ background: transparent; }}
+
 QToolBar {{
     background: {PANEL};
     border: 0;
@@ -82,12 +94,15 @@ QToolBar {{
     spacing: 2px;
 }}
 QToolBar QToolButton {{
+    background: transparent;
     color: {INK};
     padding: 3px 9px;
     border: 0;
 }}
 QToolBar QToolButton:hover {{ background: {CYAN}; color: {INK}; }}
 QToolBar QToolButton:disabled {{ color: {SHADOW}; }}
+QToolBar QCheckBox {{ background: transparent; color: {INK}; }}
+QToolBar QLabel {{ background: transparent; color: {INK}; }}
 QToolBar::separator {{ background: {SHADOW}; width: 2px; margin: 3px 5px; }}
 
 QPushButton#run {{
@@ -104,8 +119,16 @@ QPushButton {{
 }}
 QPushButton:hover {{ background: {CYAN}; }}
 
-QFrame#panel, QFrame#plotpanel {{
-    background: {PANEL};
+/* Dialogs are blue with a white border, so everything on them reads in white
+   or yellow. Grey panels with black text would need a second set of label
+   colours for the sidebar, which sits on blue. */
+QFrame#panel {{
+    background: {DESK};
+    border: 2px solid {WHITE};
+    border-radius: 0;
+}}
+QFrame#plotpanel {{
+    background: {INK};
     border: 2px solid {WHITE};
     border-radius: 0;
 }}
@@ -118,11 +141,11 @@ QLabel#heading {{
     letter-spacing: 0;
 }}
 QLabel#value, QLabel#axis {{
-    color: {INK};
+    color: {HILITE};
     font-family: "{MONO}";
     font-size: 16px;
 }}
-QLabel#secondary {{ color: {SHADOW}; font-size: 11px; }}
+QLabel#secondary {{ color: {CYAN}; font-size: 11px; }}
 QLabel#legend, QLabel#count {{ color: {CYAN}; font-size: 11px; }}
 QLabel#sitename {{ color: {HILITE}; }}
 

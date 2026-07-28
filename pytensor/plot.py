@@ -88,6 +88,17 @@ LABEL = (r'$\sigma_1$', r'$\sigma_2$', r'$\sigma_3$')
 
 PROGRAM_TAG = 'pyTENSOR'
 
+#: Ink and paper for everything drawn here. The originals are black on white,
+#: which is the default. 1991 mode swaps in phosphor green on black; set these
+#: two before drawing rather than threading a colour through every call.
+PEN = 'k'
+PAPER = 'white'
+
+
+def set_palette(pen='k', paper='white'):
+    global PEN, PAPER
+    PEN, PAPER = pen, paper
+
 
 # ------------------------------------------------------------- projection ---
 def schmidt(v):
@@ -155,7 +166,7 @@ def _draw_star(ax, x, y, index, size, lw=1.1, zorder=9):
                           inner=STAR_INNER[index],
                           phase_deg=STAR_PHASE[index])
     ax.fill(np.append(px, px[0]), np.append(py, py[0]),
-            facecolor='white', edgecolor='k', lw=lw, zorder=zorder)
+            facecolor=PAPER, edgecolor=PEN, lw=lw, zorder=zorder)
 
 
 #: The striae symbol, measured over 94 examples in the archive HPGL.
@@ -199,25 +210,25 @@ def _striae_symbol(ax, x, y, dx, dy, side=1.0, conf='C', lw=LW, zorder=5):
         w = np.array([-u[1], u[0]]) * (1.0 if side >= 0 else -1.0)
         base = np.array([x, y]) + w * SHAFT_OFFSET
         tip = base + u * SHAFT_LEN
-        ax.plot([base[0], tip[0]], [base[1], tip[1]], color='k', lw=lw,
+        ax.plot([base[0], tip[0]], [base[1], tip[1]], color=PEN, lw=lw,
                 solid_capstyle='round', zorder=zorder)
         if c == 'S':
             continue
         if c == 'P':
             p = tip - u * HEAD_P_BARB[0] + w * HEAD_P_BARB[1]
-            ax.plot([p[0], tip[0]], [p[1], tip[1]], color='k', lw=lw,
+            ax.plot([p[0], tip[0]], [p[1], tip[1]], color=PEN, lw=lw,
                     solid_capstyle='round', zorder=zorder)
         else:
             a = tip - u * HEAD_C_INNER
             b = tip - u * HEAD_C_BARB[0] + w * HEAD_C_BARB[1]
-            ax.plot([a[0], b[0], tip[0]], [a[1], b[1], tip[1]], color='k',
+            ax.plot([a[0], b[0], tip[0]], [a[1], b[1], tip[1]], color=PEN,
                     lw=lw, solid_capstyle='round', solid_joinstyle='round',
                     zorder=zorder)
 
 
 def plt_circle(x, y, r, zorder=6):
     from matplotlib.patches import Circle
-    return Circle((x, y), r, facecolor='k', edgecolor='none', zorder=zorder)
+    return Circle((x, y), r, facecolor=PEN, edgecolor='none', zorder=zorder)
 
 
 def strike_slip_sign(dipaz_deg, dip_deg, rake_deg):
@@ -264,7 +275,8 @@ def arrow_polygon(azimuth_deg, outward=True):
     return np.array(pts)
 
 
-def _heavy_arrow(ax, azimuth_deg, outward, color='k', zorder=7):
+def _heavy_arrow(ax, azimuth_deg, outward, color=None, zorder=7):
+    color = PEN if color is None else color
     p = arrow_polygon(azimuth_deg, outward)
     ax.fill(np.append(p[:, 0], p[0, 0]), np.append(p[:, 1], p[0, 1]),
             facecolor=color, edgecolor=color, lw=0.8, zorder=zorder)
@@ -275,7 +287,7 @@ def _letter(ax, strokes, cx, base=LETTER_BASE):
     """Draw one of the plotter's stroke letters."""
     xs = [cx + u * LETTER_HALF for u, _v in strokes]
     ys = [base + v * LETTER_H for _u, v in strokes]
-    ax.plot(xs, ys, color='k', lw=LW, solid_capstyle='round', zorder=6)
+    ax.plot(xs, ys, color=PEN, lw=LW, solid_capstyle='round', zorder=6)
 
 
 def draw_frame(ax, declination=None, box=True):
@@ -284,16 +296,16 @@ def draw_frame(ax, declination=None, box=True):
     Every dimension here was measured off the archive HPGL; see dump_first.py.
     """
     t = np.linspace(0, 2 * np.pi, 721)
-    ax.plot(np.cos(t), np.sin(t), color='k', lw=LW, zorder=6)
+    ax.plot(np.cos(t), np.sin(t), color=PEN, lw=LW, zorder=6)
 
     for a in (0, 90, 180, 270):                 # cardinal ticks, outward only
         r = np.radians(a)
         x, y = np.sin(r), np.cos(r)
         ax.plot([x * TICK_IN, x * TICK_OUT], [y * TICK_IN, y * TICK_OUT],
-                color='k', lw=LW, zorder=6)
+                color=PEN, lw=LW, zorder=6)
 
-    ax.plot([-CROSS_ARM, CROSS_ARM], [0, 0], color='k', lw=LW, zorder=6)
-    ax.plot([0, 0], [-CROSS_ARM, CROSS_ARM], color='k', lw=LW, zorder=6)
+    ax.plot([-CROSS_ARM, CROSS_ARM], [0, 0], color=PEN, lw=LW, zorder=6)
+    ax.plot([0, 0], [-CROSS_ARM, CROSS_ARM], color=PEN, lw=LW, zorder=6)
 
     # geographic north letter sits straight above the north tick
     _letter(ax, LETTER_N, 0.0)
@@ -305,13 +317,13 @@ def draw_frame(ax, declination=None, box=True):
     x0, y0 = np.sin(a), np.cos(a)
     ax.plot([x0, x0 * MAGNETIC_ELBOW_R, MAGNETIC_LETTER_X],
             [y0, y0 * MAGNETIC_ELBOW_R, LETTER_BASE],
-            color='k', lw=LW, solid_capstyle='round', zorder=6)
+            color=PEN, lw=LW, solid_capstyle='round', zorder=6)
     _letter(ax, LETTER_M, MAGNETIC_LETTER_X)
 
     if box:
         ax.plot([-FRAME_W, FRAME_W, FRAME_W, -FRAME_W, -FRAME_W],
                 [-FRAME_H, -FRAME_H, FRAME_H, FRAME_H, -FRAME_H],
-                color='k', lw=LW, zorder=6)
+                color=PEN, lw=LW, zorder=6)
 
     ax.set_xlim(-FRAME_W * 1.03, FRAME_W * 1.03)
     ax.set_ylim(-FRAME_H * 1.03, FRAME_H * 1.03)
@@ -346,7 +358,7 @@ def plot_site(ax, n, s, result=None, certainty=None, sides=None,
 
     for i in range(len(n)):
         for seg in great_circle(n[i]):
-            ax.plot(seg[:, 0], seg[:, 1], color='k', lw=LW, zorder=3)
+            ax.plot(seg[:, 0], seg[:, 1], color=PEN, lw=LW, zorder=3)
 
     for i in range(len(s)):
         v = s[i] if s[i][2] <= 0 else -s[i]
@@ -415,9 +427,9 @@ def annotate_result(ax, result, n_data=None, method=''):
         second.insert(0, method)
     # sits below the header / program line so the three never collide
     ax.text(0, -FRAME_H * 1.13, axes_txt, fontsize=7.5, family='monospace',
-            ha='center', va='top', color='k')
+            ha='center', va='top', color=PEN)
     ax.text(0, -FRAME_H * 1.22, '  '.join(second), fontsize=7.5,
-            family='monospace', ha='center', va='top', color='k')
+            family='monospace', ha='center', va='top', color=PEN)
 
 
 def plot_mohr(ax, result):
@@ -427,13 +439,13 @@ def plot_mohr(ax, result):
     t = np.linspace(0, np.pi, 240)
     for lo, hi, lw in ((s3, s1, 1.0), (s3, s2, 0.7), (s2, s1, 0.7)):
         c, r = 0.5 * (lo + hi), 0.5 * (hi - lo)
-        ax.plot(c + r * np.cos(t), r * np.sin(t), color='k', lw=lw)
+        ax.plot(c + r * np.cos(t), r * np.sin(t), color=PEN, lw=lw)
     if 'SIGMN' in result:
         ax.plot(result['SIGMN'], result['TAU'], 'o', ms=3.6,
-                markerfacecolor='white', markeredgecolor='k', mew=0.9, zorder=4)
-    ax.axhline(0, color='k', lw=0.7)
+                markerfacecolor=PAPER, markeredgecolor=PEN, mew=0.9, zorder=4)
+    ax.axhline(0, color=PEN, lw=0.7)
     for v, nm in ((s1, r'$\sigma_1$'), (s2, r'$\sigma_2$'), (s3, r'$\sigma_3$')):
-        ax.plot([v], [0], marker='|', ms=8, color='k')
+        ax.plot([v], [0], marker='|', ms=8, color=PEN)
         ax.annotate(nm, xy=(v, 0), xytext=(0, -14),
                     textcoords='offset points', ha='center', fontsize=8)
     ax.set_xlabel(r'$\sigma_n$', fontsize=9)

@@ -63,6 +63,16 @@ def heading(text):
     return lab
 
 
+def rule():
+    """A hairline between sidebar sections. Delineates without the group gaps
+    that were rejected in the Argon Pipeline work: the column stays tight."""
+    f = QtWidgets.QFrame()
+    f.setObjectName('rule')
+    f.setFrameShape(QtWidgets.QFrame.HLine)
+    f.setFixedHeight(1)
+    return f
+
+
 # ------------------------------------------------------------------ worker --
 class Worker(QtCore.QThread):
     done = QtCore.pyqtSignal(object)
@@ -453,7 +463,9 @@ class Main(QtWidgets.QMainWindow):
         self.ed_site.textEdited.connect(self._rename)
         v.addWidget(self.ed_site)
 
-        v.addSpacing(6)
+        v.addSpacing(4)
+        v.addWidget(rule())
+        v.addSpacing(4)
         v.addWidget(heading('new record'))
         self.entry = EntryRow()
         self.entry.submitted.connect(self.add_record)
@@ -464,7 +476,9 @@ class Main(QtWidgets.QMainWindow):
         leg.setObjectName('legend')
         v.addWidget(leg)
 
-        v.addSpacing(6)
+        v.addSpacing(4)
+        v.addWidget(rule())
+        v.addSpacing(4)
         v.addWidget(heading('reference planes'))
         row = QtWidgets.QHBoxLayout()
         row.setSpacing(3)
@@ -510,7 +524,9 @@ class Main(QtWidgets.QMainWindow):
         row.addStretch(1)
         v.addLayout(row)
 
-        v.addSpacing(6)
+        v.addSpacing(4)
+        v.addWidget(rule())
+        v.addSpacing(4)
         v.addWidget(heading('back-tilt'))
         self.cmb_bt = QtWidgets.QComboBox()
         self.cmb_bt.addItems(['off',
@@ -548,7 +564,9 @@ class Main(QtWidgets.QMainWindow):
         self.btn_tilt.clicked.connect(self.tilt_test)
         v.addWidget(self.btn_tilt)
 
-        v.addSpacing(6)
+        v.addSpacing(4)
+        v.addWidget(rule())
+        v.addSpacing(4)
         v.addWidget(heading('fault slips'))
         self.tbl = QtWidgets.QTableWidget(0, 7)
         self.tbl.setHorizontalHeaderLabels(

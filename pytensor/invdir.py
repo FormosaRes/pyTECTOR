@@ -123,12 +123,70 @@ def psidir(n, s, R, n_psi=8000):
     return tensor_A16(psi, R), obj(psi), psi
 
 
-def run(n, s, n_pass=1, n_psi=4000):
+def printed_lambda(n, s, lam, n_psi=4000):
+    """One pass, plus the LAMBDA that INFO1 would print for it.
+
+    INFO1 does not print the lambda that was fed to the solver: it prints that
+    lambda rescaled onto the normalised tensor. So the printed value depends on
+    the solution, which depends on the lambda. Hence the search below.
+    """
+    T, s4, psi, p = invdir_pass(n, s, lam, n_psi=n_psi)
+    d = describe(T)
+    scale = np.sqrt(1.5 / float((d['eigenvalues'] ** 2).sum()))
+    return lam * scale, T, d, s4
+
+
+def lambda_for_printed(n, s, target, prefer=None, n_psi=1200,
+                       lo=0.25, hi=6.0, steps=48):
+    """Find the solver lambda whose printed value is the one an archive INFO1
+    records, so a specific historical run can be reproduced rather than
+    re-derived.
+
+    The mapping from solver lambda to printed lambda is NOT monotonic: on site
+    L12 it rises to about 0.87 near lambda 2.5 and falls away again, so plain
+    bisection on the end points finds no bracket and gives up even though the
+    target is reachable. Scan first, collect every crossing, then take the one
+    nearest `prefer`, which is the lambda the iteration would have reached on
+    its own. That keeps the answer on the branch the original program was on.
+    """
+    grid = np.linspace(lo, hi, steps)
+    vals = np.array([printed_lambda(n, s, x, n_psi)[0] - target for x in grid])
+
+    roots = []
+    for i in range(len(grid) - 1):
+        if vals[i] == 0.0:
+            roots.append(grid[i])
+        elif vals[i] * vals[i + 1] < 0:
+            a, b, fa = grid[i], grid[i + 1], vals[i]
+            for _ in range(40):
+                m = 0.5 * (a + b)
+                fm = printed_lambda(n, s, m, n_psi)[0] - target
+                if fa * fm <= 0:
+                    b = m
+                else:
+                    a, fa = m, fm
+                if b - a < 1e-6:
+                    break
+            roots.append(0.5 * (a + b))
+    if not roots:
+        return None
+    if prefer is None:
+        return roots[0]
+    return min(roots, key=lambda x: abs(x - prefer))
+
+
+def run(n, s, n_pass=1, n_psi=4000, lam_printed=None):
     """Full TENSOR pipeline.
 
     n_pass reproduces the "(NO k)" that INFO1 prints. Observed in the archive:
     site 0406-7 used NO 1, site L12 used NO 2. When replicating an existing
     run, read the number out of that site's INFO1.
+
+    lam_printed, when given, is the LAMBDA an archive INFO1 records. The solver
+    lambda that produces it is solved for and used for the final pass. This
+    matters where the surface is flat: re-deriving lambda from scratch can land
+    a degree away with a slightly worse S4, whereas adopting the recorded value
+    reproduces the historical run. Site L12 is the case in point.
 
     Returns a dict with the INVDIR tensor (which fixes the axes), the PSIDIR
     tensor (which fixes Phi), and the lambda trace.
@@ -137,12 +195,19 @@ def run(n, s, n_pass=1, n_psi=4000):
     trace = []
     T = None
     for k in range(n_pass):
+        last = (k == n_pass - 1)
+        if last and lam_printed is not None:
+            # prefer the branch the iteration was already on
+            solved = lambda_for_printed(n, s, float(lam_printed), prefer=lam)
+            if solved is not None:
+                lam = solved
         T, s4, psi, p = invdir_pass(n, s, lam, n_psi=n_psi)
         d = describe(T)
         # INFO1 prints lambda rescaled onto the normalised tensor
         scale = np.sqrt(1.5 / float((d['eigenvalues'] ** 2).sum()))
         trace.append(dict(no=k + 1, lam_used=lam, lam_printed=lam * scale,
-                          phi=d['phi'], taumax_raw=d['taumax'], S4=s4))
+                          phi=d['phi'], taumax_raw=d['taumax'], S4=s4,
+                          from_archive=bool(last and lam_printed is not None)))
         lam = d['taumax']
 
     d_inv = describe(T)

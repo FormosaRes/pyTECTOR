@@ -68,16 +68,19 @@ class Worker(QtCore.QThread):
     done = QtCore.pyqtSignal(object)
     failed = QtCore.pyqtSignal(str)
 
-    def __init__(self, n, s, do_a, do_b, n_pass, parent=None):
+    def __init__(self, n, s, do_a, do_b, n_pass, lam_printed=None,
+                 parent=None):
         super(Worker, self).__init__(parent)
         self.n, self.s = n, s
         self.do_a, self.do_b, self.n_pass = do_a, do_b, n_pass
+        self.lam_printed = lam_printed
 
     def run(self):
         try:
             out = {}
             if self.do_a:
-                r = invdir.run(self.n, self.s, n_pass=self.n_pass)
+                r = invdir.run(self.n, self.s, n_pass=self.n_pass,
+                               lam_printed=self.lam_printed)
                 res = core.summary(r['T'], self.n, self.s)
                 res['T'] = r['T']
                 res['lambda_trace'] = r['lambda_trace']
@@ -254,6 +257,7 @@ class Main(QtWidgets.QMainWindow):
         self.rot = None
         self.site_name = '01'
         self.site_code = '01'
+        self.archive_lambda = None
         self._build()
         self._refresh()
 
@@ -303,6 +307,15 @@ class Main(QtWidgets.QMainWindow):
         self.sp_pass.setRange(1, 8)
         self.sp_pass.setToolTip('the "(NO k)" printed in the original INFO1')
         tb.addWidget(self.sp_pass)
+        self.cb_lam = QtWidgets.QCheckBox('archive LAMBDA')
+        self.cb_lam.setEnabled(False)
+        self.cb_lam.setToolTip(
+            'Adopt the LAMBDA the site\'s own INFO1 records instead of '
+            're-deriving it. Where the surface is flat, re-deriving can land a '
+            'degree away with a worse fit; adopting the recorded value '
+            'reproduces that historical run. Only available when the site '
+            'came with an INFO1.')
+        tb.addWidget(self.cb_lam)
         tb.addSeparator()
         self.btn_run = QtWidgets.QPushButton('INVERT')
         self.btn_run.setObjectName('run')
@@ -638,11 +651,20 @@ class Main(QtWidgets.QMainWindow):
             self.strip_ar.show_result(self.archive, len(site))
         else:
             self.strip_ar.hide()
+        self.archive_lambda = None
+        self.cb_lam.setEnabled(False)
+        self.cb_lam.setChecked(False)
         info = os.path.join(os.path.dirname(path), 'INFO1')
         if os.path.exists(info):
             d = tensorfile.read_info_lambda(info)
             if d.get('pass_no'):
                 self.sp_pass.setValue(d['pass_no'])
+            if d.get('lambda_invdir'):
+                self.archive_lambda = d['lambda_invdir']
+                self.cb_lam.setEnabled(True)
+                self.cb_lam.setChecked(True)
+                self.cb_lam.setText('archive LAMBDA %.2f'
+                                    % self.archive_lambda)
         self._refresh()
         self.status.showMessage(path)
 
@@ -658,8 +680,12 @@ class Main(QtWidgets.QMainWindow):
         self.btn_run.setEnabled(False)
         self.progress.show()
         self.status.showMessage('inverting')
+        lam = (self.archive_lambda
+               if self.cb_lam.isEnabled() and self.cb_lam.isChecked()
+               else None)
         self.worker = Worker(n, s, self.cb_a.isChecked(),
-                             self.cb_b.isChecked(), self.sp_pass.value())
+                             self.cb_b.isChecked(), self.sp_pass.value(),
+                             lam_printed=lam)
         self.worker.done.connect(self._finished)
         self.worker.failed.connect(self._failed)
         self.worker.start()

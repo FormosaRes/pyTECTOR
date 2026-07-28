@@ -360,15 +360,22 @@ def plot_site(ax, n, s, result=None, certainty=None, sides=None,
 
     certainty  per-datum 'C' / 'P' / 'S'; defaults to 'C'
     sides      per-datum +1 / -1 from strike_slip_sign(); defaults to +1
-    reference  (dip azimuth, dip) of the back-tilt reference surface, drawn
-               dashed with its pole
+    reference  reference surfaces to draw dashed with their poles, either a
+               single (dip azimuth, dip) or a list of
+               (dip azimuth, dip, is_the_back_tilt_reference)
     """
     draw_frame(ax, declination=declination, box=box)
     n = np.atleast_2d(np.asarray(n, float))
     s = np.atleast_2d(np.asarray(s, float))
 
     if reference is not None:
-        plot_reference(ax, reference[0], reference[1])
+        items = reference
+        if items and not isinstance(items[0], (list, tuple)):
+            items = [tuple(items) + (True,)]
+        for item in items:
+            az, dp = item[0], item[1]
+            plot_reference(ax, az, dp, is_ref=bool(item[2])
+                           if len(item) > 2 else False)
 
     for i in range(len(n)):
         for seg in great_circle(n[i]):
@@ -412,26 +419,35 @@ def plot_site(ax, n, s, result=None, certainty=None, sides=None,
                 fontsize=8, family='monospace')
 
 
-def plot_reference(ax, dipaz_deg, dip_deg, dashed=(5, 3), lw=None,
-                   zorder=4, pole=True):
-    """The back-tilt reference surface: its great circle as a dashed line, and
-    its pole as an open square.
+#: dash patterns: the surface driving the back-tilt is drawn with a longer
+#: dash than the others so it is identifiable at a glance
+DASH_REF = (7, 3)
+DASH_PLANE = (3, 3)
 
-    Drawn dashed so it cannot be mistaken for a fault plane, following the
-    convention in Angelier's own figures. Once a rotation is applied this is
+
+def plot_reference(ax, dipaz_deg, dip_deg, is_ref=False, lw=None,
+                   zorder=4, pole=True):
+    """A reference surface: its great circle dashed, and its pole as an open
+    square.
+
+    Dashed so it cannot be mistaken for a fault plane, following the
+    convention in Angelier's own figures. When a rotation is applied these are
     rotated with the data, so a correct restoration is visible: the dashed
     circle flattens onto the primitive and the pole walks in to the centre.
     """
     from .core import normal_from_dipaz
     lw = STROKE if lw is None else lw
+    dashed = DASH_REF if is_ref else DASH_PLANE
     n = np.atleast_2d(normal_from_dipaz(dipaz_deg, dip_deg))[0]
     for seg in great_circle(n):
-        ax.plot(seg[:, 0], seg[:, 1], color=PEN, lw=lw, zorder=zorder,
+        ax.plot(seg[:, 0], seg[:, 1], color=PEN,
+                lw=lw * (1.25 if is_ref else 1.0), zorder=zorder,
                 linestyle=(0, dashed), antialiased=AA)
     if pole:
         X, Y = schmidt(n[None, :])
-        ax.plot(X, Y, marker='s', ms=5.5, markerfacecolor=PAPER,
-                markeredgecolor=PEN, mew=lw, linestyle='none',
+        ax.plot(X, Y, marker='s', ms=6.5 if is_ref else 5.0,
+                markerfacecolor=PAPER, markeredgecolor=PEN,
+                mew=lw * (1.25 if is_ref else 1.0), linestyle='none',
                 zorder=zorder + 1, antialiased=AA)
 
 

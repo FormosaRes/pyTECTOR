@@ -151,6 +151,11 @@ QLabel#value, QLabel#axis {{
 }}
 QLabel#secondary {{ color: {CYAN}; font-size: 11px; }}
 QLabel#legend, QLabel#count {{ color: {CYAN}; font-size: 11px; }}
+QLabel#state {{
+    color: {INK}; background: {HILITE};
+    font-family: "{MONO}"; font-size: 11px; font-weight: 600;
+    padding: 2px 8px; border: 0;
+}}
 QLabel#sitename {{ color: {HILITE}; }}
 
 QLineEdit {{

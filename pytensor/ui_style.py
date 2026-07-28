@@ -116,6 +116,16 @@ QLabel#secondary {{
     font-size: 11px;
 }}
 QLabel#legend {{ color: {MUTED}; font-size: 11px; }}
+/* the banner saying which state is on screen; loud on purpose */
+QLabel#state {{
+    color: {WARN};
+    font-family: "{MONO}";
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border: 1px solid {WARN};
+    border-radius: 3px;
+}}
 QLabel#count {{ color: {MUTED}; font-size: 11px; }}
 QLabel#sitename {{ font-size: 15px; font-weight: 600; }}
 QLabel#warn {{ color: {WARN}; font-size: 11px; }}

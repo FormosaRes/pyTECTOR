@@ -87,6 +87,19 @@ for name, path in SITES:
     check('mean ANG', res['ANG_mean'], arch['ANG_mean'], tol_mean)
     check('mean RUP', res['RUP_mean'], arch['RUP_mean'], tol_mean)
 
+    # ---- 2b. adopting the archive's own LAMBDA ----------------------------
+    if info.get('lambda_invdir'):
+        r2 = invdir.run(n, s, n_pass=info.get('pass_no', 1),
+                        lam_printed=info['lambda_invdir'])
+        res2 = core.summary(r2['T'], n, s)
+        va = core.vec_from_trend_plunge(*arch['sigma1'])
+        vb = core.vec_from_trend_plunge(*res2['sigma1'])
+        dev = np.degrees(np.arccos(min(abs(float(va @ vb)), 1.0)))
+        print('  adopting the recorded LAMBDA %.2f' % info['lambda_invdir'])
+        check('sigma1 deviation (deg)', dev, 0.0, 1.0)
+        check('S4 vs the original', core.S4(r2['T'], n, s),
+              core.S4(T_arch, n, s), 0.02)
+
     # ---- 3. Mode B: must not be worse than the original -------------------
     b = modern.run(n, s, n_starts=200)
     s4_arch = core.S4(T_arch, n, s)

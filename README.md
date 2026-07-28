@@ -64,6 +64,31 @@ is an exact 3×3 linear solve. Angelier's Appendix I–II do this by hand; the
 polynomials are regenerated numerically here because the appendix is
 unreadable in the available scan.
 
+### Reproducing a specific historical run
+
+λ is re-derived from scratch by default. Where the pass-1 surface is nearly
+flat that can land a degree away with a *worse* fit than the original: on L12,
+six near-parallel near-vertical planes, re-deriving gives σ₁ 82.2/35.7 with
+S₄ 0.3150 against the original's 81.0/35.9 at 0.3013.
+
+Passing `lam_printed=` the LAMBDA the site's own INFO1 records fixes it. The
+solver λ that prints that value is solved for, and the run follows the original:
+
+| site | re-derived | adopting the recorded LAMBDA |
+|---|---|---|
+| L12 | 1.02° off, S₄ +0.0137 | **0.31° off, S₄ −0.0028** |
+| CH-01ABE | 1.35° off, S₄ +0.0538 | **0.89° off, S₄ +0.0350** |
+| 0406-7 | 0.05° off | 0.08° off |
+
+One trap: the map from solver λ to printed λ is **not monotonic**. On L12 it
+rises to about 0.87 near λ 2.5 and falls away again, so bisecting on the end
+points finds no bracket and gives up even though the target is reachable. The
+search scans, collects every crossing, and takes the one nearest the λ the
+iteration had already reached.
+
+In the interface this is the **archive LAMBDA** box, enabled and ticked
+automatically when a site is loaded with an INFO1 beside it.
+
 **S4MIN — `pytensor.modern`, code `S4MN`, the exact minimum of the same S₄.**
 Eigen-decomposition parametrisation, λ fixed at √3/2, global search. It reaches
 a lower S₄ on **all 92 archive sites**, without exception:

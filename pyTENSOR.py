@@ -536,9 +536,16 @@ class Main(QtWidgets.QMainWindow):
         self.tbl.verticalHeader().hide()
         self.tbl.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.tbl.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
-        self.tbl.horizontalHeader().setStretchLastSection(True)
-        for i, wd in enumerate((26, 30, 38, 104, 44, 42)):
+        # 'as typed' absorbs the slack. Stretching the LAST column instead
+        # pushes rake off the right edge as soon as the sidebar is narrow.
+        hh = self.tbl.horizontalHeader()
+        hh.setStretchLastSection(False)
+        for i, wd in enumerate((22, 28, 32, 60, 40, 38, 36)):
             self.tbl.setColumnWidth(i, wd)
+            hh.setSectionResizeMode(i, QtWidgets.QHeaderView.Fixed)
+        hh.setSectionResizeMode(3, QtWidgets.QHeaderView.Stretch)
+        hh.setMinimumSectionSize(20)
+        self.tbl.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.tbl.verticalHeader().setDefaultSectionSize(19)
         self.tbl.itemChanged.connect(self._use_changed)
         v.addWidget(self.tbl, 1)

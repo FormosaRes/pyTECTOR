@@ -209,11 +209,41 @@ Both the fault normals and the slip vectors are rotated, so rakes and senses
 carry through. The site label picks up the rotation in the archive's own form,
 `(backtilted 020 -20)`.
 
+The reference surface is drawn as a dashed great circle with its pole, and it
+rotates with the data, so a correct restoration is visible: the dashed circle
+flattens onto the primitive and the pole walks in to the centre. With a
+rotation in force the data are inverted twice, before and after, and both
+solutions are shown.
+
 **The angle is not computed.** There is no analytical solution for it: it is
 found by trying values and looking at the result, which is why the archive
 folders are named after what was tried. This only makes trying fast and records
 what is in force. Choosing the reference surface, and the angle, stay with the
 user.
+
+### Restoring to horizontal is not automatically right
+
+That assumes the faults predate the tilting. If they formed *during* it, only
+part of the tilt post-dates them, and removing all of it over-rotates the data
+into a stress tensor that never existed.
+
+Two diagnostics are reported, and **Tilt test** sweeps the rotation from 0 to
+125 per cent, inverting at every step and plotting both:
+
+| | what it says |
+|---|---|
+| mean ANG, RUP, S₄ | how well one tensor explains the data. Best near 100 per cent means the faults predate the tilting |
+| Andersonian misfit | 90° minus the plunge of the steepest axis, so 0 is one axis vertical and two horizontal. Also names the regime: σ₁ vertical normal, σ₂ strike-slip, σ₃ thrust |
+
+A best answer well short of full restoration is what syn-tilt faulting looks
+like, and the program says so. If the two criteria disagree by more than 20 per
+cent of the rotation it says that too, because the disagreement needs
+explaining before either is trusted. Neither is proof; they are diagnostics.
+
+Worked example, site 0404-4C-2 against an invented reference plane: both
+criteria get *worse* with restoration, best fit at 10 per cent, and the
+Andersonian misfit rises from 40.8° to 49.2°. Restoring that plane to
+horizontal would have quietly produced a worse answer than the raw data.
 
 The convention was fixed against the archive rather than assumed: solving for
 the rotation between an original site and its back-tilted copy (Kabsch on the

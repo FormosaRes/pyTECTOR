@@ -556,11 +556,16 @@ def annotate_result(ax, result, n_data=None, method=''):
         second.append('N %d' % n_data)
     if method:
         second.insert(0, method)
-    # sits below the header / program line so the three never collide
-    ax.text(0, -FRAME_H * 1.13, axes_txt, fontsize=7.5, family='monospace',
+    # Below the header and program line, and anchored to the same caption row
+    # so the three never collide however the frame constants are revised.
+    top = CAPTION_Y - 0.10
+    ax.text(0, top, axes_txt, fontsize=7.5, family='monospace',
             ha='center', va='top', color=PEN)
-    ax.text(0, -FRAME_H * 1.22, '  '.join(second), fontsize=7.5,
+    ax.text(0, top - 0.11, '  '.join(second), fontsize=7.5,
             family='monospace', ha='center', va='top', color=PEN)
+    # draw_frame set the limits for a plot without this block; make room, or
+    # an exported figure relies on bbox_inches='tight' to rescue it
+    ax.set_ylim(top - 0.24, FRAME_T * 1.04)
 
 
 def plot_mohr(ax, result):

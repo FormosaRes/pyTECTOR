@@ -24,7 +24,7 @@ Andersonian misfit before and after rather than assuming that flat bedding is
 the answer, and the tilt test sweeps partial restorations.
 """
 import numpy as np
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
 
 import matplotlib
 matplotlib.use('Qt5Agg')

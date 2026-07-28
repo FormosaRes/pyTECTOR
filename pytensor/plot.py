@@ -354,15 +354,21 @@ def _regime_arrows(ax, result):
 # ------------------------------------------------------------------- main ---
 def plot_site(ax, n, s, result=None, certainty=None, sides=None,
               declination=None, site_code=None, header=None,
-              program=PROGRAM_TAG, show_axes=True, box=True):
+              program=PROGRAM_TAG, show_axes=True, box=True,
+              reference=None):
     """Angelier-style stereogram of a fault-slip data set.
 
     certainty  per-datum 'C' / 'P' / 'S'; defaults to 'C'
     sides      per-datum +1 / -1 from strike_slip_sign(); defaults to +1
+    reference  (dip azimuth, dip) of the back-tilt reference surface, drawn
+               dashed with its pole
     """
     draw_frame(ax, declination=declination, box=box)
     n = np.atleast_2d(np.asarray(n, float))
     s = np.atleast_2d(np.asarray(s, float))
+
+    if reference is not None:
+        plot_reference(ax, reference[0], reference[1])
 
     for i in range(len(n)):
         for seg in great_circle(n[i]):
@@ -404,6 +410,38 @@ def plot_site(ax, n, s, result=None, certainty=None, sides=None,
     if program:
         ax.text(FRAME_W, -FRAME_H * 1.05, str(program), ha='right', va='top',
                 fontsize=8, family='monospace')
+
+
+def plot_reference(ax, dipaz_deg, dip_deg, dashed=(5, 3), lw=None,
+                   zorder=4, pole=True):
+    """The back-tilt reference surface: its great circle as a dashed line, and
+    its pole as an open square.
+
+    Drawn dashed so it cannot be mistaken for a fault plane, following the
+    convention in Angelier's own figures. Once a rotation is applied this is
+    rotated with the data, so a correct restoration is visible: the dashed
+    circle flattens onto the primitive and the pole walks in to the centre.
+    """
+    from .core import normal_from_dipaz
+    lw = STROKE if lw is None else lw
+    n = np.atleast_2d(normal_from_dipaz(dipaz_deg, dip_deg))[0]
+    for seg in great_circle(n):
+        ax.plot(seg[:, 0], seg[:, 1], color=PEN, lw=lw, zorder=zorder,
+                linestyle=(0, dashed), antialiased=AA)
+    if pole:
+        X, Y = schmidt(n[None, :])
+        ax.plot(X, Y, marker='s', ms=5.5, markerfacecolor=PAPER,
+                markeredgecolor=PEN, mew=lw, linestyle='none',
+                zorder=zorder + 1, antialiased=AA)
+
+
+def reference_from_vectors(nvec):
+    """Dip azimuth and dip of a plane given its (possibly rotated) normal."""
+    v = np.asarray(nvec, float)
+    v = v if v[2] >= 0 else -v
+    dip = float(np.degrees(np.arccos(np.clip(v[2], -1, 1))))
+    dipaz = float(np.degrees(np.arctan2(v[0], v[1])) % 360.0)
+    return dipaz, dip
 
 
 def plot_fitted(ax, n, T, **kw):

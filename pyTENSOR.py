@@ -36,7 +36,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 
 from pytensor import (about, core, entry, invdir, modern, plot, report, retro,
-                      rotate, splash, tensorfile, tilt)
+                      rotate, splash, tensorfile, tilt, tiltui)
 from pytensor.ui_style import QSS, MUTED
 
 AXES = ('sigma1', 'sigma2', 'sigma3')
@@ -475,6 +475,15 @@ class Main(QtWidgets.QMainWindow):
         self.lbl_bt.setWordWrap(True)
         v.addWidget(self.lbl_bt)
 
+        self.btn_tilt = QtWidgets.QPushButton('Tilt test')
+        self.btn_tilt.setEnabled(False)
+        self.btn_tilt.setToolTip(
+            'Invert at every partial restoration from 0 to 125 per cent and '
+            'plot both diagnostics, so syn-tilt faulting shows up as a best '
+            'answer short of full restoration.')
+        self.btn_tilt.clicked.connect(self.tilt_test)
+        v.addWidget(self.btn_tilt)
+
         v.addSpacing(6)
         v.addWidget(heading('fault slips'))
         self.tbl = QtWidgets.QTableWidget(0, 5)
@@ -607,6 +616,9 @@ class Main(QtWidgets.QMainWindow):
             self.lbl_bt.setText(
                 'axis %03.0f / %02.0f, angle %+.0f%s   %s\n%s'
                 % (t, p, a, DEG, note, rotate.describe(t, p, a)))
+        if hasattr(self, 'btn_tilt'):
+            self.btn_tilt.setEnabled(bool(self.rot)
+                                     and len(self.records) >= 4)
         self.results = {}
         for s in (self.strip_a, self.strip_b):
             s.clear()
@@ -614,6 +626,24 @@ class Main(QtWidgets.QMainWindow):
         self.txt_info.clear()
         self.txt_mohr.clear()
         self._draw()
+
+    def tilt_test(self):
+        if not self.rot or len(self.records) < 4:
+            return
+        n, s = self.n_s_raw
+        dlg = tiltui.TiltDialog(n, s, self.rot, self.sp_pass.value(), self)
+        dlg.adopt.connect(self._adopt_rotation)
+        dlg.exec_()
+
+    def _adopt_rotation(self, trend, plunge, angle):
+        """Switch the panel to the explicit axis so the chosen partial
+        restoration is what is applied, and is visible."""
+        self.cmb_bt.setCurrentIndex(3)
+        for e, val in zip(self.bt_fields, (trend, plunge, angle)):
+            e.setText('%.4g' % val)
+        self._bt_changed()
+        self.status.showMessage('back-tilt set to %+.1f deg about %03.0f/%02.0f'
+                                % (angle, trend, plunge))
 
     # -------------------------------------------------------------- data --
     @property
@@ -699,6 +729,9 @@ class Main(QtWidgets.QMainWindow):
         self.lbl_count.setText('%d fault%s'
                                % (len(self.records),
                                   '' if len(self.records) == 1 else 's'))
+        if hasattr(self, 'btn_tilt'):
+            self.btn_tilt.setEnabled(bool(self.rot)
+                                     and len(self.records) >= 4)
         if not self.results:
             for s in (self.strip_a, self.strip_b):
                 s.clear()

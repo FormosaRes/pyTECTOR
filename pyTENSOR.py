@@ -35,8 +35,8 @@ matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 
-from pytensor import (core, entry, invdir, modern, plot, report, rotate,
-                      tensorfile)
+from pytensor import (core, entry, invdir, modern, plot, report, retro,
+                      rotate, splash, tensorfile)
 from pytensor.ui_style import QSS, MUTED
 
 AXES = ('sigma1', 'sigma2', 'sigma3')
@@ -835,6 +835,40 @@ class Main(QtWidgets.QMainWindow):
             fh.write(text)
         self.status.showMessage('saved ' + fn)
 
+    # -------------------------------------------------------- 1991 mode --
+    def toggle_1991(self, on=None):
+        """Turbo Pascal blue and Angelier's own French.
+
+        Reached by clicking the J.A. signature on the opening screen. Purely
+        cosmetic: nothing about the inversion changes.
+        """
+        self.retro = (not getattr(self, 'retro', False)) if on is None else on
+        app = QtWidgets.QApplication.instance()
+        app.setStyleSheet(retro.QSS if self.retro else QSS)
+        self.setWindowTitle(retro.TITLE if self.retro else 'pyTENSOR')
+
+        for w in self.findChildren(QtWidgets.QLabel):
+            if w.objectName() == 'heading':
+                base = w.property('en') or w.text()
+                w.setProperty('en', base)
+                w.setText(retro.translate(base) if self.retro else base)
+        for act in self.findChildren(QtWidgets.QAction):
+            base = act.property('en') or act.text()
+            act.setProperty('en', base)
+            act.setText(retro.translate(base) if self.retro else base)
+        for cb in (self.cb_fit,):
+            base = cb.property('en') or cb.text()
+            cb.setProperty('en', base)
+            cb.setText(retro.translate(base) if self.retro else base)
+        self.btn_run.setText(retro.translate('INVERT') if self.retro
+                             else 'INVERT')
+        self.tabs.setTabText(0, retro.translate('Results') if self.retro
+                             else 'Results')
+        self.status.showMessage(
+            'MODE 1991  —  ' + retro.TITLE if self.retro
+            else 'type a record, for example  CS 122 87W 124')
+        self._draw()
+
     def save_hpgl(self):
         from pytensor import hpgl
         fn, _ = QtWidgets.QFileDialog.getSaveFileName(
@@ -871,7 +905,16 @@ def main():
     app.setStyle('Fusion')
     app.setStyleSheet(QSS)
     w = Main()
+
+    sp = splash.Splash()
+    retro_wanted = {'on': False}
+    sp.signature_clicked.connect(lambda: retro_wanted.__setitem__('on', True))
+    if splash.image_path():
+        sp.exec_()
+
     w.show()
+    if retro_wanted['on']:
+        w.toggle_1991(True)
     w.entry.focus()
     return app.exec_()
 

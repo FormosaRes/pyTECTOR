@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pytensor import core, invdir, report, tensorfile
 
 P = (sys.argv[1] if len(sys.argv) > 1 else
-     r"C:\Users\龐麒修\iCloudDrive\博士論文\Paper\清水溪\清水溪應力\L12\L12")
+     os.path.join(ROOT))
 
 site = tensorfile.read_site(P)
 folder = os.path.dirname(P)

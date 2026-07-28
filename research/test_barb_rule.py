@@ -18,6 +18,8 @@ import sys
 
 import numpy as np
 
+sys.path.insert(0, os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from catalogue_striae import symbols_of, ROOT
 from pytensor import core

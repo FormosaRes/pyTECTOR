@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from pytensor import core, invdir, modern, tensorfile
 
-ROOT = r"C:\Users\龐麒修\iCloudDrive\博士論文\Paper\清水溪\清水溪應力"
+from pytensor.archive import ROOT
 SITES = [('L12', os.path.join(ROOT, 'L12', 'L12')),
          ('0406-7', os.path.join(ROOT, '0406-7', '0406-04'))]
 

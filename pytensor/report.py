@@ -106,15 +106,21 @@ def _axis_lines(res, indent=INDENT_FILE):
 
 def result_line(res, n, method='INVD', acc=9, site='01', record=1,
                 total=None):
-    """The fixed-width '03' line that both files end with."""
+    """The fixed-width '03' line that both files end with.
+
+    The site field is exactly TWO characters. '%2s' is a minimum width, not a
+    maximum, so a longer label silently pushes the record number out of its
+    column and breaks the layout for anything that reads the file back. Hence
+    the explicit slice.
+    """
     total = float(n if total is None else total)
     s1, s2, s3 = res['sigma1'], res['sigma2'], res['sigma3']
     return ('03%-4s%02d%5.1f%4.1f%5.1f%4.1f%5.1f%4.1f%5.3f%4.1f%5.1f'
             '%02d%02d%4d.%3d%2s%9d'
-            % (method, acc,
+            % (method[:4], acc,
                s1[0], s1[1], s2[0], s2[1], s3[0], s3[1],
                res['phi'], res['ANG_mean'], res['RUP_mean'],
-               acc, 19, int(round(total)), n, site, record))
+               acc, 19, int(round(total)), n, str(site)[:2], record))
 
 
 def mohr1_text(res, n_data, method='INVD', site='01', record=1):

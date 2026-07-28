@@ -10,10 +10,11 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))))
 from pytensor import hpgl, tensorfile, plot as pplot
 
-ROOT = r"C:\Users\龐麒修\iCloudDrive\博士論文\Paper\清水溪\清水溪應力"
+from pytensor.archive import ROOT
 CONF = {'1': 'C', '2': 'P', '3': 'S'}
 
 folder, datafile = '0406-7', '0406-04'
@@ -69,7 +70,7 @@ for ax, (c, i) in zip(axes.ravel(), picks):
 for ax in axes.ravel()[len(picks):]:
     ax.axis('off')
 
-out = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+out = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                    'arrow_styles.png')
 fig.savefig(out, dpi=150, bbox_inches='tight', facecolor='white')
 print('written:', out)

@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pytensor import core, invdir, plot, tensorfile
 
-ROOT = r"C:\Users\龐麒修\iCloudDrive\博士論文\Paper\清水溪\清水溪應力"
+from pytensor.archive import ROOT
 site = tensorfile.read_site(os.path.join(ROOT, '0406-7', '0406-04'))
 n, s = site.n, site.s
 r = invdir.run(n, s, n_pass=1)

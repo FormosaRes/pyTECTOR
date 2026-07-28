@@ -8,10 +8,11 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))))
 from pytensor import hpgl
 
-ROOT = r"C:\Users\龐麒修\iCloudDrive\博士論文\Paper\清水溪\清水溪應力"
+from pytensor.archive import ROOT
 SITES = [('L12', os.path.join(ROOT, 'L12', 'HPGL')),
          ('0406-7', os.path.join(ROOT, '0406-7', 'HPGL'))]
 
@@ -33,7 +34,7 @@ for ax, (name, path) in zip(axes, SITES):
     hpgl.draw(ax, polys, labels)
     ax.set_title('%s  (original TENSOR HPGL)' % name, fontsize=10)
 
-out = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+out = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                    'angelier_original_plots.png')
 fig.savefig(out, dpi=140, bbox_inches='tight', facecolor='white')
 print('\nwritten:', out)

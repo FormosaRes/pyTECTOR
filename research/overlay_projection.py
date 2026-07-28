@@ -9,12 +9,11 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))))
 from pytensor import core, hpgl, tensorfile
 
-ROOT = r"C:\Users\龐麒修\iCloudDrive\博士論文\Paper\清水溪\清水溪應力"
-
-
+from pytensor.archive import ROOT
 def primitive(polys):
     best, score = None, -1
     for _pen, p in polys:
@@ -78,7 +77,7 @@ for ax, (folder, datafile) in zip(axes, (('0406-7', '0406-04'),
     ax.axis('off')
     ax.legend(loc='lower left', fontsize=8)
 
-out = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+out = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                    'projection_overlay.png')
 fig.savefig(out, dpi=150, bbox_inches='tight', facecolor='white')
 print('written:', out)

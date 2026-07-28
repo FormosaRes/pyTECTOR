@@ -180,9 +180,18 @@ class ResultStrip(QtWidgets.QFrame):
     """One row of results. Principal axes and the shape ratio go at full size;
     only n and S4 are allowed to be small and grey."""
 
+    #: (axis labels, ratio label). The French is Angelier's own wording from
+    #: INFO1: 'AXIS SIGMA 1' and 'RATIO PHI' become 'AXE SIGMA 1' and
+    #: 'RAPPORT PHI'.
+    WORDS = {False: (('σ₁', 'σ₂', 'σ₃'), 'Φ'),
+             True: (('AXE SIGMA 1', 'AXE SIGMA 2', 'AXE SIGMA 3'),
+                    'RAPPORT PHI')}
+
     def __init__(self, title, parent=None):
         super(ResultStrip, self).__init__(parent)
         self.setObjectName('panel')
+        self.words = ResultStrip.WORDS[False]
+        self._last = None
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(11, 8, 11, 9)
         lay.setSpacing(3)
@@ -218,20 +227,32 @@ class ResultStrip(QtWidgets.QFrame):
         row.addStretch(1)
         lay.addLayout(row)
 
+    def set_language(self, retro_on):
+        """Switch between the symbols and Angelier's own French wording."""
+        self.words = ResultStrip.WORDS[bool(retro_on)]
+        if self._last is None:
+            self.clear()
+        else:
+            self.show_result(*self._last)
+
     def clear(self):
-        for lab, sym in zip(self.axis_labels, SYM):
+        syms, phi = self.words
+        for lab, sym in zip(self.axis_labels, syms):
             lab.setText('%s  -' % sym)
-        self.phi.setText('%s -' % PHI)
+        self.phi.setText('%s -' % phi)
         self.ang.setText('ANG -')
         self.rup.setText('RUP -')
         self.small.setText('')
+        self._last = None
 
     def show_result(self, r, n_data=None):
-        for lab, sym, key in zip(self.axis_labels, SYM, AXES):
+        self._last = (r, n_data)
+        syms, phi_lab = self.words
+        for lab, sym, key in zip(self.axis_labels, syms, AXES):
             tr, pl = r[key]
             lab.setText('%s %03d/%02d' % (sym, int(round(tr)) % 360,
                                           int(round(pl))))
-        self.phi.setText('%s %.3f' % (PHI, r['phi']))
+        self.phi.setText('%s %.3f' % (phi_lab, r['phi']))
         if 'ANG_mean' in r:
             self.ang.setText('ANG %.1f%s' % (r['ANG_mean'], DEG))
             self.rup.setText('RUP %.0f%%' % r['RUP_mean'])
@@ -855,13 +876,18 @@ class Main(QtWidgets.QMainWindow):
         app.setStyleSheet(retro.QSS if self.retro else QSS)
         self.setWindowTitle(retro.TITLE if self.retro else 'pyTENSOR')
 
-        # phosphor green on black for the stereogram
+        # phosphor green on black, and hard aliased edges so the lines read as
+        # pixels rather than as smooth strokes
         if self.retro:
-            plot.set_palette(retro.PLOT_PEN, retro.PLOT_PAPER)
+            plot.set_palette(retro.PLOT_PEN, retro.PLOT_PAPER,
+                             aa=False, stroke=retro.PLOT_STROKE)
             self.fig.set_facecolor(retro.PLOT_PAPER)
         else:
             plot.set_palette()
             self.fig.set_facecolor('white')
+
+        for strip in (self.strip_ar, self.strip_a, self.strip_b):
+            strip.set_language(self.retro)
 
         for w in self.findChildren(QtWidgets.QLabel):
             if w.objectName() == 'heading':

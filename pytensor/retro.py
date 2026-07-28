@@ -38,6 +38,8 @@ MONO = 'Consolas'       # stands in for a bitmap console face
 #: been drawn on before it reached the plotter
 PLOT_PEN = '#3BF23B'
 PLOT_PAPER = '#000000'
+#: a touch heavier with antialiasing off, so the stair steps are legible
+PLOT_STROKE = 1.2
 
 #: label -> (French, provenance)
 VOCAB = {

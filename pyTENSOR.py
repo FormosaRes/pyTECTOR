@@ -320,6 +320,7 @@ class Main(QtWidgets.QMainWindow):
         self.archive = None
         self.rot = None
         self.planes = []
+        self._loading = False
         self.site_name = '01'
         self.site_code = '01'
         self.archive_lambda = None
@@ -529,16 +530,17 @@ class Main(QtWidgets.QMainWindow):
 
         v.addSpacing(6)
         v.addWidget(heading('fault slips'))
-        self.tbl = QtWidgets.QTableWidget(0, 5)
-        self.tbl.setHorizontalHeaderLabels(['', 'dip az', 'dip', 'rake',
-                                            'typed'])
+        self.tbl = QtWidgets.QTableWidget(0, 7)
+        self.tbl.setHorizontalHeaderLabels(
+            ['#', 'use', 'type', 'as typed', 'strike', 'dip', 'rake'])
         self.tbl.verticalHeader().hide()
         self.tbl.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.tbl.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.tbl.horizontalHeader().setStretchLastSection(True)
-        for i, wd in enumerate((30, 48, 34, 42)):
+        for i, wd in enumerate((26, 30, 38, 104, 44, 42)):
             self.tbl.setColumnWidth(i, wd)
         self.tbl.verticalHeader().setDefaultSectionSize(19)
+        self.tbl.itemChanged.connect(self._use_changed)
         v.addWidget(self.tbl, 1)
 
         row = QtWidgets.QHBoxLayout()
@@ -553,13 +555,6 @@ class Main(QtWidgets.QMainWindow):
         row.addWidget(b)
         v.addLayout(row)
 
-        v.addSpacing(6)
-        v.addWidget(heading('runs found'))
-        self.list_sites = QtWidgets.QListWidget()
-        self.list_sites.setMaximumHeight(130)
-        self.list_sites.itemDoubleClicked.connect(
-            lambda it: self._load(it.data(QtCore.Qt.UserRole)))
-        v.addWidget(self.list_sites)
         return w
 
     def _workspace(self):
@@ -766,9 +761,16 @@ class Main(QtWidgets.QMainWindow):
 
     # -------------------------------------------------------------- data --
     @property
+    def active(self):
+        """The faults with their switch on. Everything downstream, the
+        inversion and the plots, uses only these; an excluded datum stays in
+        the table greyed out so the decision is visible and reversible."""
+        return [r for r in self.records if r.get('use', True)]
+
+    @property
     def n_s(self):
         """Fault normals and slips, back-tilted if a rotation is in force."""
-        n, s = entry.records_to_arrays(self.records)
+        n, s = entry.records_to_arrays(self.active)
         if getattr(self, 'rot', None) and len(n):
             n, s = rotate.rotate_site(n, s, *self.rot)
         return n, s
@@ -776,7 +778,7 @@ class Main(QtWidgets.QMainWindow):
     @property
     def n_s_raw(self):
         """The same data as measured, whatever rotation is in force."""
-        return entry.records_to_arrays(self.records)
+        return entry.records_to_arrays(self.active)
 
     def reference_now(self, rotated):
         """Every entered surface, optionally carried through the rotation so a
@@ -795,17 +797,17 @@ class Main(QtWidgets.QMainWindow):
 
     @property
     def confidence(self):
-        return [r.get('confidence', 'C') for r in self.records]
+        return [r.get('confidence', 'C') for r in self.active]
 
     @property
     def sides(self):
         """Which side the barb sits on, from the strike-slip component."""
-        if not self.records:
+        act = self.active
+        if not act:
             return np.zeros(0)
         return plot.strike_slip_sign(
-            [r['dipaz'] for r in self.records],
-            [r['dip'] for r in self.records],
-            [r['rake'] + tensorfile.RAKE_OFFSET for r in self.records])
+            [r['dipaz'] for r in act], [r['dip'] for r in act],
+            [r['rake'] + tensorfile.RAKE_OFFSET for r in act])
 
     def _rename(self, txt):
         self.site_name = txt or '01'
@@ -837,23 +839,64 @@ class Main(QtWidgets.QMainWindow):
         self._refresh()
         self.entry.focus()
 
+    @staticmethod
+    def quadrant(dipaz):
+        """The single letter the field notation uses for the dip direction."""
+        a = float(dipaz) % 360.0
+        if a < 45 or a >= 315:
+            return 'N'
+        if a < 135:
+            return 'E'
+        if a < 225:
+            return 'S'
+        return 'W'
+
+    def _use_changed(self, item):
+        if self._loading or item.column() != 1:
+            return
+        i = item.row()
+        if 0 <= i < len(self.records):
+            on = item.checkState() == QtCore.Qt.Checked
+            if self.records[i].get('use', True) != on:
+                self.records[i]['use'] = on
+                self.results = {}
+                self._refresh()
+
     def _refresh(self):
+        self._loading = True
         self.tbl.setRowCount(len(self.records))
         for i, r in enumerate(self.records):
-            vals = (r.get('confidence', 'C'), r['dipaz'], r['dip'],
-                    '%.0f' % r['rake'], r.get('tail', ''))
+            # the entry convention here is strike and dip, not dip azimuth
+            strike = (r['dipaz'] - 90.0) % 360.0
+            vals = ['%d' % (i + 1), None, r.get('sense') or r.get('code', ''),
+                    r.get('tail', ''), '%03.0f' % strike,
+                    '%02d%s' % (r['dip'], self.quadrant(r['dipaz'])),
+                    '%.0f' % r['rake']]
             for j, val in enumerate(vals):
-                it = QtWidgets.QTableWidgetItem(str(val))
-                if j:
-                    it.setTextAlignment(QtCore.Qt.AlignRight
-                                        | QtCore.Qt.AlignVCenter)
+                if j == 1:
+                    it = QtWidgets.QTableWidgetItem()
+                    it.setFlags(QtCore.Qt.ItemIsUserCheckable
+                                | QtCore.Qt.ItemIsEnabled
+                                | QtCore.Qt.ItemIsSelectable)
+                    it.setCheckState(QtCore.Qt.Checked
+                                     if r.get('use', True)
+                                     else QtCore.Qt.Unchecked)
+                else:
+                    it = QtWidgets.QTableWidgetItem(str(val))
+                    if j in (0, 4, 5, 6):
+                        it.setTextAlignment(QtCore.Qt.AlignRight
+                                            | QtCore.Qt.AlignVCenter)
+                    if not r.get('use', True):
+                        it.setForeground(QtGui.QBrush(QtGui.QColor('#A9A59C')))
                 self.tbl.setItem(i, j, it)
-        self.lbl_count.setText('%d fault%s'
-                               % (len(self.records),
-                                  '' if len(self.records) == 1 else 's'))
+        self._loading = False
+        used = len(self.active)
+        total = len(self.records)
+        self.lbl_count.setText('%d fault%s' % (used, '' if used == 1 else 's')
+                               + ('' if used == total
+                                  else '   %d excluded' % (total - used)))
         if hasattr(self, 'btn_tilt'):
-            self.btn_tilt.setEnabled(bool(self.rot)
-                                     and len(self.records) >= 4)
+            self.btn_tilt.setEnabled(bool(self.rot) and used >= 4)
         if not self.results:
             for s in (self.strip_a, self.strip_b):
                 s.clear()
@@ -870,20 +913,41 @@ class Main(QtWidgets.QMainWindow):
             self._load(fn)
 
     def scan_folder(self):
+        """Find every run under a folder and offer them in a picker, rather
+        than parking a list in the sidebar that is empty most of the time."""
         d = QtWidgets.QFileDialog.getExistingDirectory(
             self, 'Folder containing TENSOR runs')
         if not d:
             return
         found = tensorfile.discover(d)
-        self.list_sites.clear()
+        if not found:
+            QtWidgets.QMessageBox.information(
+                self, 'pyTENSOR', 'No TENSOR runs found under that folder.')
+            return
+        dlg = QtWidgets.QDialog(self)
+        dlg.setWindowTitle('%d runs found' % len(found))
+        dlg.resize(560, 460)
+        lay = QtWidgets.QVBoxLayout(dlg)
+        lst = QtWidgets.QListWidget()
         for p in found:
             it = QtWidgets.QListWidgetItem(
                 os.path.relpath(p, d).replace('\\', '/'))
             it.setData(QtCore.Qt.UserRole, p)
-            self.list_sites.addItem(it)
-        self.status.showMessage('%d runs found' % len(found))
-        if found:
-            self._load(found[0])
+            lst.addItem(it)
+        lst.setCurrentRow(0)
+        lst.itemDoubleClicked.connect(lambda _i: dlg.accept())
+        lay.addWidget(lst)
+        row = QtWidgets.QHBoxLayout()
+        row.addStretch(1)
+        ok = QtWidgets.QPushButton('Open')
+        ok.clicked.connect(dlg.accept)
+        row.addWidget(ok)
+        no = QtWidgets.QPushButton('Cancel')
+        no.clicked.connect(dlg.reject)
+        row.addWidget(no)
+        lay.addLayout(row)
+        if dlg.exec_() and lst.currentItem():
+            self._load(lst.currentItem().data(QtCore.Qt.UserRole))
 
     def _load(self, path):
         try:
@@ -921,7 +985,7 @@ class Main(QtWidgets.QMainWindow):
 
     # --------------------------------------------------------- inversion ---
     def invert(self):
-        if len(self.records) < 4:
+        if len(self.active) < 4:
             QtWidgets.QMessageBox.information(
                 self, 'pyTENSOR',
                 'Four fault slips are the minimum: the reduced stress tensor '
@@ -1025,7 +1089,7 @@ class Main(QtWidgets.QMainWindow):
             return None, None
         trace = r.get('lambda_trace') or []
         return r, dict(site_file=self.plot_name, res=r,
-                       n_data=len(self.records),
+                       n_data=len(self.active),
                        invdir=r.get('invdir_summary'),
                        lam_invdir=trace[-1]['lam_printed'] if trace else None,
                        pass_no=self.sp_pass.value(),
@@ -1044,7 +1108,7 @@ class Main(QtWidgets.QMainWindow):
         # lines belong in the exported file, not on screen
         self.txt_info.setPlainText(report.info1_text(compact=True, **kw))
         self.txt_mohr.setPlainText(
-            report.mohr1_text(r, len(self.records), method=kw['method'],
+            report.mohr1_text(r, len(self.active), method=kw['method'],
                               site=kw['site']))
 
     # ------------------------------------------------------------ drawing --
@@ -1119,7 +1183,7 @@ class Main(QtWidgets.QMainWindow):
                                header='AS MEASURED  no rotation')
                 if annotate:
                     plot.annotate_result(ax, self.results['RAW'],
-                                         n_data=len(self.records))
+                                         n_data=len(self.active))
             if show_rot:
                 for k in keys:
                     ax = cell()
@@ -1131,7 +1195,7 @@ class Main(QtWidgets.QMainWindow):
                                             + NAME[k]) if self.rot
                                            else NAME[k]))
                     if annotate:
-                        plot.annotate_result(ax, r, n_data=len(self.records))
+                        plot.annotate_result(ax, r, n_data=len(self.active))
                 if want_fit:
                     ax = cell()
                     plot.plot_fitted(ax, n, self.results[keys[0]]['T'],
@@ -1168,7 +1232,7 @@ class Main(QtWidgets.QMainWindow):
         if which == 'INFO1':
             text = report.info1_text(full_header=True, **kw)
         else:
-            text = report.mohr1_text(r, len(self.records),
+            text = report.mohr1_text(r, len(self.active),
                                      method=kw['method'], site=kw['site'])
         with open(fn, 'w', newline='\n', encoding='ascii',
                   errors='replace') as fh:

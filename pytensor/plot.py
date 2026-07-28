@@ -445,7 +445,7 @@ def plot_reference(ax, dipaz_deg, dip_deg, is_ref=False, lw=None,
                 linestyle=(0, dashed), antialiased=AA)
     if pole:
         X, Y = schmidt(n[None, :])
-        ax.plot(X, Y, marker='s', ms=6.5 if is_ref else 5.0,
+        ax.plot(X, Y, marker='o', ms=7.0 if is_ref else 5.5,
                 markerfacecolor=PAPER, markeredgecolor=PEN,
                 mew=lw * (1.25 if is_ref else 1.0), linestyle='none',
                 zorder=zorder + 1, antialiased=AA)

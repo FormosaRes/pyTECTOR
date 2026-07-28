@@ -29,7 +29,10 @@ class Splash(QtWidgets.QDialog):
     """Frameless opening screen. Emits signature_clicked when J.A. is hit."""
     signature_clicked = QtCore.pyqtSignal()
 
-    def __init__(self, parent=None, scale=1.25):
+    #: it closes itself after this long, so not clicking never blocks startup
+    DWELL_MS = 4000
+
+    def __init__(self, parent=None, scale=1.25, dwell_ms=None):
         super(Splash, self).__init__(parent)
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint
                             | QtCore.Qt.Dialog)
@@ -75,7 +78,14 @@ class Splash(QtWidgets.QDialog):
             'Jacques Angelier')
         s.setStyleSheet('font-size: 11px; color: #6B665B;')
         fl.addWidget(s)
+        hint = QtWidgets.QLabel('click anywhere to continue')
+        hint.setStyleSheet('font-size: 10px; color: #A9A59C;')
+        fl.addWidget(hint)
         lay.addWidget(foot)
+
+        # never leave the user staring at a screen that will not go away
+        QtCore.QTimer.singleShot(
+            self.DWELL_MS if dwell_ms is None else dwell_ms, self.accept)
 
     # ------------------------------------------------------------------
     def _sig_rect(self):

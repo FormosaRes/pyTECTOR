@@ -35,7 +35,7 @@ matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 
-from pytensor import (core, entry, invdir, modern, plot, report, retro,
+from pytensor import (about, core, entry, invdir, modern, plot, report, retro,
                       rotate, splash, tensorfile)
 from pytensor.ui_style import QSS, MUTED
 
@@ -175,8 +175,42 @@ class EntryRow(QtWidgets.QWidget):
         self.fields[0].setFocus()
 
 
+# ------------------------------------------------------------------ panel --
+class Panel(QtWidgets.QFrame):
+    """A framed panel that paints a DOS double-line border in 1991 mode.
+
+    Two nested rectangles a few pixels apart, which is what a terminal drew
+    when it printed the box characters. Qt stylesheets cannot express a double
+    border, so the retro stylesheet drops the border entirely and this paints
+    it instead.
+    """
+    GAP = 3
+
+    def __init__(self, name='panel', parent=None):
+        super(Panel, self).__init__(parent)
+        self.setObjectName(name)
+        self.retro = False
+
+    def set_retro(self, on):
+        self.retro = bool(on)
+        self.update()
+
+    def paintEvent(self, ev):
+        super(Panel, self).paintEvent(ev)
+        if not self.retro:
+            return
+        p = QtGui.QPainter(self)
+        pen = QtGui.QPen(QtGui.QColor(retro.WHITE))
+        pen.setWidth(1)
+        p.setPen(pen)
+        r = self.rect().adjusted(0, 0, -1, -1)
+        p.drawRect(r)
+        p.drawRect(r.adjusted(self.GAP, self.GAP, -self.GAP, -self.GAP))
+        p.end()
+
+
 # ----------------------------------------------------------- result widget --
-class ResultStrip(QtWidgets.QFrame):
+class ResultStrip(Panel):
     """One row of results. Principal axes and the shape ratio go at full size;
     only n and S4 are allowed to be small and grey."""
 
@@ -188,8 +222,7 @@ class ResultStrip(QtWidgets.QFrame):
                     'RAPPORT PHI')}
 
     def __init__(self, title, parent=None):
-        super(ResultStrip, self).__init__(parent)
-        self.setObjectName('panel')
+        super(ResultStrip, self).__init__('panel', parent)
         self.words = ResultStrip.WORDS[False]
         self._last = None
         lay = QtWidgets.QVBoxLayout(self)
@@ -351,6 +384,17 @@ class Main(QtWidgets.QMainWindow):
             lambda: self._save_report('INFO1'))
         tb.addAction('Save MOHR1').triggered.connect(
             lambda: self._save_report('MOHR1'))
+        spacer = QtWidgets.QWidget()
+        spacer.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                             QtWidgets.QSizePolicy.Preferred)
+        tb.addWidget(spacer)
+        # only appears once 1991 mode is on, so it is a way back rather than a
+        # spoiler sitting in the toolbar from the start
+        self.act_1991 = tb.addAction('MODE 1991  ×')
+        self.act_1991.setToolTip('back to the normal interface')
+        self.act_1991.setVisible(False)
+        self.act_1991.triggered.connect(lambda: self.toggle_1991(False))
+        tb.addAction('About').triggered.connect(self.show_about)
 
         split = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
         split.setChildrenCollapsible(False)
@@ -459,8 +503,8 @@ class Main(QtWidgets.QMainWindow):
         split = QtWidgets.QSplitter(QtCore.Qt.Vertical)
         split.setChildrenCollapsible(False)
 
-        holder = QtWidgets.QFrame()
-        holder.setObjectName('plotpanel')
+        holder = Panel('plotpanel')
+        self.plot_holder = holder
         hv = QtWidgets.QVBoxLayout(holder)
         hv.setContentsMargins(4, 4, 4, 4)
         self.fig = Figure(figsize=(11, 5.6), facecolor='white')
@@ -864,6 +908,9 @@ class Main(QtWidgets.QMainWindow):
             fh.write(text)
         self.status.showMessage('saved ' + fn)
 
+    def show_about(self):
+        about.About(self).exec_()
+
     # -------------------------------------------------------- 1991 mode --
     def toggle_1991(self, on=None):
         """Turbo Pascal blue and Angelier's own French.
@@ -888,6 +935,10 @@ class Main(QtWidgets.QMainWindow):
 
         for strip in (self.strip_ar, self.strip_a, self.strip_b):
             strip.set_language(self.retro)
+        for pan in self.findChildren(Panel):
+            pan.set_retro(self.retro)
+
+        self.act_1991.setVisible(self.retro)
 
         for w in self.findChildren(QtWidgets.QLabel):
             if w.objectName() == 'heading':
@@ -895,6 +946,8 @@ class Main(QtWidgets.QMainWindow):
                 w.setProperty('en', base)
                 w.setText(retro.translate(base) if self.retro else base)
         for act in self.findChildren(QtWidgets.QAction):
+            if act is self.act_1991:
+                continue          # its label is the way out, leave it alone
             base = act.property('en') or act.text()
             act.setProperty('en', base)
             act.setText(retro.translate(base) if self.retro else base)
@@ -948,11 +1001,12 @@ def main():
     app.setStyleSheet(QSS)
     w = Main()
 
-    sp = splash.Splash()
     retro_wanted = {'on': False}
-    sp.signature_clicked.connect(lambda: retro_wanted.__setitem__('on', True))
     if splash.image_path():
-        sp.exec_()
+        sp = splash.Splash()
+        sp.signature_clicked.connect(
+            lambda: retro_wanted.__setitem__('on', True))
+        sp.exec_()          # dismisses on a click, a key, or its own timer
 
     w.show()
     if retro_wanted['on']:

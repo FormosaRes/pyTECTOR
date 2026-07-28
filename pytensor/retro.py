@@ -124,14 +124,16 @@ QPushButton:hover {{ background: {CYAN}; }}
 /* Dialogs are blue with a white border, so everything on them reads in white
    or yellow. Grey panels with black text would need a second set of label
    colours for the sidebar, which sits on blue. */
+/* No border here: a stylesheet cannot draw a double line, so Panel paints the
+   two nested rectangles itself. */
 QFrame#panel {{
     background: {DESK};
-    border: 2px solid {WHITE};
+    border: 0;
     border-radius: 0;
 }}
 QFrame#plotpanel {{
     background: {INK};
-    border: 2px solid {WHITE};
+    border: 0;
     border-radius: 0;
 }}
 
@@ -158,6 +160,15 @@ QLineEdit {{
 }}
 QLineEdit:focus {{ border: 1px solid {HILITE}; }}
 QLineEdit#seg {{ font-family: "{MONO}"; font-size: 15px; }}
+/* Disabled fields were yellow-on-black turning to near-black-on-black. Grey on
+   grey reads as switched off while staying legible, which is what a DOS
+   dialog did with an inactive control. */
+QLineEdit:disabled {{
+    background: {SHADOW}; color: {PANEL}; border: 1px solid {SHADOW};
+}}
+QComboBox:disabled, QSpinBox:disabled {{
+    background: {SHADOW}; color: {PANEL};
+}}
 
 QComboBox, QSpinBox {{
     background: {PANEL}; color: {INK}; border: 0;

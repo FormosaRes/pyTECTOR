@@ -13,9 +13,9 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pytensor import core, invdir, modern, tensorfile
 
-DEFAULT_ROOT = r"<PYTECTOR_ARCHIVE>"
+from pytensor.archive import ROOT
 
-
+DEFAULT_ROOT = ROOT
 def axis_gap(a, b):
     va = core.vec_from_trend_plunge(*a)
     vb = core.vec_from_trend_plunge(*b)

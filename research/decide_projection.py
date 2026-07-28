@@ -12,12 +12,11 @@ import sys
 
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))))
 from pytensor import hpgl, tensorfile
 
-ROOT = r"<PYTECTOR_ARCHIVE>"
-
-
+from pytensor.archive import ROOT
 def primitive(polys):
     best, score = None, -1
     for _pen, p in polys:

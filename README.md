@@ -170,18 +170,71 @@ Two layout details worth recording, both easy to get wrong:
   0406-7 the mean ANG is 21 over all 29 faults but 15 over the 28 below 45,
   the difference being the single datum at 174 degrees.
 
+## Back-tilting
+
+Rotate the data before inverting, three ways:
+
+| mode | input | what it does |
+|---|---|---|
+| reference plane | dip azimuth / dip | the rotation that restores that plane to horizontal |
+| reference plane by pole | trend / plunge | the same, given the plane by its pole |
+| rotation axis | trend / plunge / angle | applies it directly, right-hand rule |
+
+Both the fault normals and the slip vectors are rotated, so rakes and senses
+carry through. The site label picks up the rotation in the archive's own form,
+`(backtilted 020 -20)`.
+
+**The angle is not computed.** There is no analytical solution for it: it is
+found by trying values and looking at the result, which is why the archive
+folders are named after what was tried. This only makes trying fast and records
+what is in force. Choosing the reference surface, and the angle, stay with the
+user.
+
+The convention was fixed against the archive rather than assumed: solving for
+the rotation between an original site and its back-tilted copy (Kabsch on the
+fault normals) reproduces all seven cases to better than 2°.
+
+## The reference archive
+
+Tests and the derivation scripts read real output from the original program.
+That is unpublished field data, so its location is not baked into the source:
+
+```
+set PYTENSOR_ARCHIVE=<folder holding the TENSOR run folders>
+```
+
+Without it, those tests skip rather than fail.
+
+## Layout
+
+```
+pytensor/          the library
+  core            geometry, the criterion, the quality estimators
+  invdir          INVDIR, Angelier's parametrisation and pipeline
+  modern          S4MIN, the exact minimum
+  tensorfile      read the old site files
+  report          write INFO1 and MOHR1
+  entry           parse typed records
+  plot            Angelier-style stereograms
+  hpgl            read and write the plotter files
+  rotate          back-tilting
+pyTENSOR.py        desktop interface
+tests/             regression against the archive
+research/          how every constant was measured, see its own README
+```
+
 ## Usage
 
 ```
 pyTENSOR.bat                           desktop interface
 python demo_report.py [site file]      invert an old site, print INFO1 + MOHR1
-python run_batch.py [root] [out.csv]   both modes over a whole folder tree
+python run_batch.py [root] [out.csv]   both runs over a whole folder tree
 python tests/test_replication.py       regression against the archive
 python tests/test_report.py            INFO1 / MOHR1 layout and values
+python tests/test_rotate.py            back-tilt convention
 ```
 
-Requires the Anaconda interpreter (`C:\ANACONDA\python.exe`): numpy, scipy,
-matplotlib, PyQt5.
+numpy, scipy, matplotlib, PyQt5.
 
 ## Status
 

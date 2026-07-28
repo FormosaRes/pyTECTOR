@@ -253,6 +253,7 @@ class Main(QtWidgets.QMainWindow):
         self.archive = None
         self.rot = None
         self.site_name = '01'
+        self.site_code = '01'
         self._build()
         self._refresh()
 
@@ -628,6 +629,7 @@ class Main(QtWidgets.QMainWindow):
             return
         self.records = [dict(r) for r in site.records]
         self.site_name = site.name
+        self.site_code = getattr(site, 'code', '01')
         self.ed_site.setText(site.name)
         self.results = {}
         self.archive = tensorfile.parse_result_line(site.result_line)
@@ -721,7 +723,9 @@ class Main(QtWidgets.QMainWindow):
                        invdir=r.get('invdir_summary'),
                        lam_invdir=trace[-1]['lam_printed'] if trace else None,
                        pass_no=self.sp_pass.value(),
-                       site=self.site_name[:12],
+                       # the two-character code the file carries, not the file
+                       # name: it goes into fixed-width fields
+                       site=getattr(self, 'site_code', '01'),
                        method=CODE[tag])
 
     def _write_reports(self):

@@ -13,10 +13,11 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))))
 from pytensor import hpgl, plot, tensorfile
 
-ROOT = r"<PYTECTOR_ARCHIVE>"
+from pytensor.archive import ROOT
 DOT_R = 0.028
 
 
@@ -178,7 +179,7 @@ for ax, (conf, mv, x) in zip(axes, picks):
 fig.suptitle('striae symbols lifted from the archive HPGL   '
              '(red = slip direction, only that symbol\'s own strokes drawn)',
              fontsize=9, y=1.06)
-out = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+out = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                    'striae_catalogue.png')
 fig.savefig(out, dpi=210, bbox_inches='tight', facecolor='white')
 print('\nwritten:', out)

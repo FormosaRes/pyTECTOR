@@ -17,7 +17,8 @@ import sys
 
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))))
 
 path = sys.argv[1] if len(sys.argv) > 1 else 'pytensor_AB_comparison.csv'
 rows = list(csv.DictReader(open(path, encoding='utf-8-sig')))

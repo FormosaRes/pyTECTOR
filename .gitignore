@@ -1,6 +1,12 @@
 __pycache__/
 *.pyc
+*.pyo
+
+# generated output, not source
 *.png
 *.csv
-*.txt
-!README*
+*.hpgl
+batch_log.txt
+demo_*.txt
+/INFO1
+/MOHR1

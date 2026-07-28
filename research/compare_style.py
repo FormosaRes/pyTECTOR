@@ -10,10 +10,11 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))))
 from pytensor import core, hpgl, plot, tensorfile
 
-ROOT = r"<PYTECTOR_ARCHIVE>"
+from pytensor.archive import ROOT
 SITES = [('L12', 'L12', 'L12', 5.0), ('0406-7', '0406-04', '0406-7', 6.9)]
 
 fig, axes = plt.subplots(2, len(SITES), figsize=(12.5, 12.6))
@@ -44,6 +45,6 @@ for col, (folder, datafile, label, decl) in enumerate(SITES):
     plot.annotate_result(ax, res, n_data=len(site))
     ax.set_title('%s   pyTENSOR, same tensor' % label, fontsize=10)
 
-out = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'style_check.png')
+out = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'style_check.png')
 fig.savefig(out, dpi=135, bbox_inches='tight', facecolor='white')
 print('written:', out)

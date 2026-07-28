@@ -60,11 +60,15 @@ MOVEMENT = {'I': 'inverse', 'N': 'normal', 'S': 'senestral', 'D': 'dextral'}
 
 
 class Site(object):
-    def __init__(self, name, records, result_line=None, path=None):
+    def __init__(self, name, records, result_line=None, path=None,
+                 code='01'):
         self.name = name
         self.records = records
         self.result_line = result_line
         self.path = path
+        #: the two-character site code the file itself carries, which is what
+        #: belongs in the fixed-width fields. Not the file name.
+        self.code = code
 
     def __len__(self):
         return len(self.records)
@@ -105,14 +109,15 @@ def read_site(path):
         lines = fh.read().splitlines()
 
     name = os.path.basename(path)
-    records, result = [], None
+    records, result, site_code = [], None, '01'
     for ln in lines:
         if len(ln) < 10:
             continue
         head = ln[:2]
         if head in ('02',):                       # file header
             continue
-        if head == '01':                          # site label
+        if head == '01':                          # site label line, e.g. 01PANG
+            site_code = head
             continue
         if head == '03':                          # result line
             result = ln
@@ -131,7 +136,11 @@ def read_site(path):
                             confidence=CONFIDENCE.get(head[0], 'C'),
                             movement=(tail[1:2].upper() if len(tail) > 1
                                       else '')))
-    return Site(name, records, result, path)
+        if len(ln) >= 63:
+            site_code = ln[61:63].strip() or site_code
+    site = Site(name, records, result, path)
+    site.code = site_code
+    return site
 
 
 #: field widths of the '03' result line, after the 8-character prefix

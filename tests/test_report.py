@@ -20,7 +20,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from pytensor import core, report, tensorfile
 
-ROOT = r"<PYTECTOR_ARCHIVE>"
+from pytensor.archive import ROOT
 SITES = [('L12', 'L12'), ('0406-7', '0406-04')]
 NUM = re.compile(r'-?\d+\.?\d*')
 
@@ -125,6 +125,20 @@ for folder, datafile in SITES:
         return [l for l in lines if '03INVD' in l or '03PSID' in l]
 
     compare('03 line', res_line(got), res_line(want), tol=0.4)
+
+print('=' * 74)
+print('fixed-width fields survive an over-long site label')
+long_res = dict(sigma1=(81.0, 35.9), sigma2=(331.1, 25.1),
+                sigma3=(214.6, 43.6), phi=0.413, ANG_mean=8.7, RUP_mean=23.1)
+short = report.result_line(long_res, 6, site='01')
+longer = report.result_line(long_res, 6, site='L12')
+print('   site 01  : %r' % short)
+print('   site L12 : %r' % longer)
+if len(short) != len(longer):
+    print('   FAIL: a longer site label changes the line length')
+    fails.append('site field width')
+else:
+    print('   ok: same length, the site field is clipped to two characters')
 
 print('=' * 74)
 print('%d failures' % len(fails))

@@ -116,6 +116,23 @@ QLabel#secondary {{
     font-size: 11px;
 }}
 QLabel#legend {{ color: {MUTED}; font-size: 11px; }}
+/* the line that says what the data are; always present above the plot */
+QLabel#context {{
+    color: {INK};
+    font-family: "{MONO}";
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 4px;
+}}
+/* results no longer describe the data on screen */
+QLabel#stale {{
+    color: #FFFFFF;
+    background: #C0392B;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 3px;
+}}
 /* the banner saying which state is on screen; loud on purpose */
 QLabel#state {{
     color: {WARN};

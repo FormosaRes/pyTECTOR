@@ -594,11 +594,19 @@ class Main(QtWidgets.QMainWindow):
         hv.setContentsMargins(4, 4, 4, 4)
         hv.setSpacing(4)
 
-        # Which state is on screen must never be in doubt: a selector on the
-        # left and a banner on the right that spells out the rotation.
+        # What is on screen must never be in doubt. One bar, always present:
+        # what the data are on the left, which state is drawn on the right.
         bar = QtWidgets.QHBoxLayout()
-        bar.setSpacing(6)
-        bar.setContentsMargins(6, 2, 6, 0)
+        bar.setSpacing(8)
+        bar.setContentsMargins(6, 3, 6, 1)
+        self.lbl_context = QtWidgets.QLabel('')
+        self.lbl_context.setObjectName('context')
+        bar.addWidget(self.lbl_context)
+        bar.addStretch(1)
+        self.lbl_stale = QtWidgets.QLabel('')
+        self.lbl_stale.setObjectName('stale')
+        self.lbl_stale.hide()
+        bar.addWidget(self.lbl_stale)
         self.cmb_view = QtWidgets.QComboBox()
         self.cmb_view.addItems(['AS MEASURED', 'BACK-TILTED', 'BOTH'])
         self.cmb_view.setToolTip(
@@ -609,7 +617,6 @@ class Main(QtWidgets.QMainWindow):
         self.lbl_state = QtWidgets.QLabel('')
         self.lbl_state.setObjectName('state')
         bar.addWidget(self.lbl_state)
-        bar.addStretch(1)
         hv.addLayout(bar)
 
         self.fig = Figure(figsize=(11, 5.4), facecolor='white')
@@ -1070,6 +1077,7 @@ class Main(QtWidgets.QMainWindow):
                 strip.show_result(out[tag], n)
             else:
                 strip.clear()
+        self._result_print = self._fingerprint()
         self.lbl_diff.setText(self._difference() + self._tilt_note())
         self._write_reports()
         self.status.showMessage('done')
@@ -1159,6 +1167,38 @@ class Main(QtWidgets.QMainWindow):
             report.mohr1_text(r, len(self.active), method=kw['method'],
                               site=kw['site']))
 
+    # ------------------------------------------------------------ context --
+    def _fingerprint(self):
+        """Everything a result depends on. If this changes after an inversion,
+        what is on screen no longer describes the current data."""
+        return (tuple((r['dipaz'], r['dip'], round(r['rake'], 3),
+                       bool(r.get('use', True))) for r in self.records),
+                self.rot, self.sp_pass.value(),
+                self.cb_a.isChecked(), self.cb_b.isChecked(),
+                self.cb_lam.isChecked() if self.cb_lam.isEnabled() else None)
+
+    def _update_context(self):
+        """The one line that says what the data are, always visible."""
+        used, total = len(self.active), len(self.records)
+        bits = ['SITE %s' % (self.site_name or '01')]
+        bits.append('%d fault%s' % (used, '' if used == 1 else 's'))
+        if used != total:
+            bits.append('%d excluded' % (total - used))
+        if self.planes:
+            bits.append('%d reference surface%s'
+                        % (len(self.planes),
+                           '' if len(self.planes) == 1 else 's'))
+        self.lbl_context.setText('     '.join(bits))
+
+        stale = (bool(self.results)
+                 and self._fingerprint() != getattr(self, '_result_print',
+                                                    None))
+        self.lbl_stale.setVisible(stale)
+        if stale:
+            self.lbl_stale.setText('data changed since this result   '
+                                   'press INVERT')
+        return stale
+
     # ------------------------------------------------------------ drawing --
     def _draw(self, annotate=False):
         """annotate=False on screen: the result strips already carry the
@@ -1166,10 +1206,25 @@ class Main(QtWidgets.QMainWindow):
         duplicate them and crowd the footer. Exported figures stand alone, so
         they do get the numbers."""
         self.fig.clear()
+        stale = self._update_context()
         n, s = self.n_s
         conf, sides = self.confidence, self.sides
         keys = [k for k in ('A', 'B') if k in self.results]
         want_fit = bool(keys) and self.cb_fit.isChecked()
+
+        if not len(n):
+            ax = self.fig.add_subplot(111)
+            ax.set_facecolor(plot.PAPER)
+            ax.axis('off')
+            ax.text(0.5, 0.55, 'no fault slips yet',
+                    ha='center', va='center', fontsize=13,
+                    color='#7A776F' if plot.PEN == 'k' else plot.PEN)
+            ax.text(0.5, 0.44,
+                    'type one on the left, for example   CS - 122 - 87W - 124',
+                    ha='center', va='center', fontsize=10,
+                    color='#A9A59C' if plot.PEN == 'k' else plot.PEN)
+            self.canvas.draw()
+            return
 
         # Which state is on screen. With no rotation there is only one, and
         # the selector is forced to it so the label can never lie.
@@ -1195,11 +1250,19 @@ class Main(QtWidgets.QMainWindow):
                      + (len(keys) if show_rot else 0)
                      + (1 if (want_fit and show_rot) else 0), 1)
         col = [0]
+        title_colour = '#1E1E1C' if plot.PEN == 'k' else plot.PEN
 
-        def cell():
+        def cell(title=None, sub=None):
+            """A panel. On screen it gets a plain title above the frame so
+            there is no hunting in the footer for what you are looking at;
+            exported figures keep Angelier's layout and omit it."""
             col[0] += 1
             ax = self.fig.add_subplot(1, panels, col[0])
             ax.set_facecolor(plot.PAPER)
+            if title and not annotate:
+                ax.set_title(title + ('\n' + sub if sub else ''),
+                             fontsize=11, fontweight='600',
+                             color=title_colour, pad=8, linespacing=1.5)
             return ax
 
         rot_tag = ''
@@ -1212,8 +1275,12 @@ class Main(QtWidgets.QMainWindow):
             decl = plot.MAGNETIC_OFFSET
 
         if not keys:
-            ax = cell()
             show_rotated = bool(self.rot) and view != 0
+            ax = cell('BACK-TILTED' if show_rotated
+                      else ('AS MEASURED' if self.rot else 'OBSERVED DATA'),
+                      sub=(rot_tag.strip() if show_rotated
+                           else ('rotation not applied here' if self.rot
+                                 else 'not yet inverted')))
             plot.plot_site(
                 ax, n if show_rotated else self.n_s_raw[0],
                 s if show_rotated else self.n_s_raw[1],
@@ -1228,7 +1295,7 @@ class Main(QtWidgets.QMainWindow):
         else:
             if show_raw:
                 rn, rs = self.n_s_raw
-                ax = cell()
+                ax = cell('AS MEASURED', 'no rotation applied')
                 plot.plot_site(ax, rn, rs, self.results['RAW'],
                                certainty=conf, sides=sides,
                                site_code=self.site_name,
@@ -1239,7 +1306,10 @@ class Main(QtWidgets.QMainWindow):
                                          n_data=len(self.active))
             if show_rot:
                 for k in keys:
-                    ax = cell()
+                    ax = cell(('BACK-TILTED  ' + NAME[k]) if self.rot
+                              else NAME[k],
+                              (rot_tag.strip() if self.rot
+                               else MODES[0 if k == 'A' else 1][3]))
                     r = self.results[k]
                     plot.plot_site(ax, n, s, r, certainty=conf, sides=sides,
                                    site_code=self.plot_name,
@@ -1251,11 +1321,19 @@ class Main(QtWidgets.QMainWindow):
                     if annotate:
                         plot.annotate_result(ax, r, n_data=len(self.active))
                 if want_fit:
-                    ax = cell()
+                    ax = cell('FITTED SHEAR',
+                              'what the solution predicts on these planes')
                     plot.plot_fitted(ax, n, self.results[keys[0]]['T'],
                                      site_code=self.plot_name,
                                      header='fitted shear', declination=decl)
-        self.fig.subplots_adjust(left=0.01, right=0.99, top=0.99,
+        if stale:
+            # unmistakable, because acting on an out-of-date stereogram is the
+            # kind of mistake that survives all the way into a figure
+            self.fig.text(0.5, 0.5, 'OUT OF DATE', ha='center', va='center',
+                          fontsize=42, color='#C0392B', alpha=0.16,
+                          rotation=18, zorder=50)
+        self.fig.subplots_adjust(left=0.01, right=0.99,
+                                 top=0.99 if annotate else 0.88,
                                  bottom=0.14 if annotate else 0.06,
                                  wspace=0.02)
         self.canvas.draw()

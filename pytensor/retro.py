@@ -156,6 +156,15 @@ QLabel#state {{
     font-family: "{MONO}"; font-size: 11px; font-weight: 600;
     padding: 2px 8px; border: 0;
 }}
+QLabel#context {{
+    color: {WHITE}; font-family: "{MONO}"; font-size: 12px;
+    font-weight: 600; padding: 2px 4px;
+}}
+QLabel#stale {{
+    color: {WHITE}; background: #A80000;
+    font-family: "{MONO}"; font-size: 11px; font-weight: 600;
+    padding: 2px 8px; border: 0;
+}}
 QLabel#sitename {{ color: {HILITE}; }}
 
 QLineEdit {{

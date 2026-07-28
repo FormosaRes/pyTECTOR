@@ -111,11 +111,23 @@ class Writer(object):
     """Emit HPGL in the same dialect TENSOR uses, so pyTENSOR output can be
     dropped into the same viewers and plotters as the originals."""
 
-    def __init__(self, scale=2500.0, origin=(2910, 3164)):
-        #: plotter units per unit radius of the stereogram, and the centre.
-        #: Defaults reproduce the framing of the archive files.
-        self.scale = scale
-        self.origin = origin
+    #: Measured off the archive rather than guessed. In 0404-01/HPGL the centre
+    #: cross sits at 2908, 3008 with arms of 204 units and the primitive circle
+    #: has radius 2002; 204 / 2002 = 0.1019, which is the CROSS_ARM that plot.py
+    #: measured independently. The previous defaults, 2500 and 2910, 3164, drew
+    #: the plot a quarter too large and 156 units too high, so pyTENSOR output
+    #: did not overlay the originals.
+    SCALE = 2002.0
+    ORIGIN = (2908, 3008)
+
+    #: Plotter units per centimetre of character size, from the same files:
+    #: the archive sets SI 0.25,0.25 for its captions and 0.50 for the site
+    #: code, and those come out at the sizes seen in the plots.
+    UNITS_PER_CM = 400.0
+
+    def __init__(self, scale=None, origin=None):
+        self.scale = self.SCALE if scale is None else scale
+        self.origin = self.ORIGIN if origin is None else origin
         self.out = ['IN;', 'SP1;', 'CS0;', 'LT;']
 
     def _xy(self, x, y):
@@ -133,8 +145,15 @@ class Writer(object):
             self.out.append('PA%d,%d;' % (a, b))
         self.out.append('PU;')
 
-    def label(self, x, y, text):
+    def label(self, x, y, text, ha='left', size_cm=0.25):
+        """HPGL anchors a label at the pen, so centring and right alignment
+        have to be done here, by stepping back one character cell per
+        character. A cell is about the SI width; close enough for a caption."""
         a, b = self._xy(x, y)
+        if ha in ('center', 'centre', 'right'):
+            wide = len(text) * size_cm * self.UNITS_PER_CM
+            a -= int(round(wide * (0.5 if ha != 'right' else 1.0)))
+        self.out.append('DI 1,0;SI %.2f,%.2f;' % (size_cm, size_cm))
         self.out.append('PU;PA%d,%d;LB%s\x03' % (a, b, text))
 
     def dumps(self):

@@ -319,7 +319,7 @@ class Main(QtWidgets.QMainWindow):
         self.results = {}
         self.archive = None
         self.rot = None
-        self.reference = None
+        self.planes = []
         self.site_name = '01'
         self.site_code = '01'
         self.archive_lambda = None
@@ -446,11 +446,54 @@ class Main(QtWidgets.QMainWindow):
         v.addWidget(leg)
 
         v.addSpacing(6)
+        v.addWidget(heading('reference planes'))
+        row = QtWidgets.QHBoxLayout()
+        row.setSpacing(3)
+        self.cmb_ptype = QtWidgets.QComboBox()
+        self.cmb_ptype.addItems(['plane', 'pole'])
+        self.cmb_ptype.setFixedWidth(64)
+        row.addWidget(self.cmb_ptype)
+        self.pl_fields = []
+        for hint in ('212', '87'):
+            e = QtWidgets.QLineEdit()
+            e.setObjectName('seg')
+            e.setFixedWidth(52)
+            e.setAlignment(QtCore.Qt.AlignCenter)
+            e.setPlaceholderText(hint)
+            e.returnPressed.connect(self.add_plane)
+            self.pl_fields.append(e)
+            row.addWidget(e)
+        b = QtWidgets.QPushButton('Add')
+        b.clicked.connect(self.add_plane)
+        row.addWidget(b)
+        row.addStretch(1)
+        v.addLayout(row)
+
+        self.list_planes = QtWidgets.QListWidget()
+        self.list_planes.setMaximumHeight(84)
+        self.list_planes.setToolTip(
+            'Double-click a surface to make it the back-tilt reference. '
+            'It is then drawn with a longer dash.')
+        self.list_planes.itemDoubleClicked.connect(self._star_plane)
+        v.addWidget(self.list_planes)
+
+        row = QtWidgets.QHBoxLayout()
+        row.setSpacing(3)
+        b = QtWidgets.QPushButton('Set as reference')
+        b.clicked.connect(lambda: self._star_plane(
+            self.list_planes.currentItem()))
+        row.addWidget(b)
+        b = QtWidgets.QPushButton('Remove')
+        b.clicked.connect(self.remove_plane)
+        row.addWidget(b)
+        row.addStretch(1)
+        v.addLayout(row)
+
+        v.addSpacing(6)
         v.addWidget(heading('back-tilt'))
         self.cmb_bt = QtWidgets.QComboBox()
         self.cmb_bt.addItems(['off',
-                              'reference plane   dip az / dip',
-                              'reference plane by pole   trend / plunge',
+                              'restore the reference surface',
                               'rotation axis   trend / plunge / angle'])
         self.cmb_bt.currentIndexChanged.connect(self._bt_changed)
         v.addWidget(self.cmb_bt)
@@ -458,7 +501,7 @@ class Main(QtWidgets.QMainWindow):
         row = QtWidgets.QHBoxLayout()
         row.setSpacing(3)
         self.bt_fields = []
-        for hint in ('212', '87', '-20'):
+        for hint in ('020', '00', '-20'):
             e = QtWidgets.QLineEdit()
             e.setObjectName('seg')
             e.setFixedWidth(58)
@@ -527,9 +570,29 @@ class Main(QtWidgets.QMainWindow):
         self.plot_holder = holder
         hv = QtWidgets.QVBoxLayout(holder)
         hv.setContentsMargins(4, 4, 4, 4)
-        self.fig = Figure(figsize=(11, 5.6), facecolor='white')
+        hv.setSpacing(4)
+
+        # Which state is on screen must never be in doubt: a selector on the
+        # left and a banner on the right that spells out the rotation.
+        bar = QtWidgets.QHBoxLayout()
+        bar.setSpacing(6)
+        bar.setContentsMargins(6, 2, 6, 0)
+        self.cmb_view = QtWidgets.QComboBox()
+        self.cmb_view.addItems(['AS MEASURED', 'BACK-TILTED', 'BOTH'])
+        self.cmb_view.setToolTip(
+            'Which data the stereogram shows. Back-tilted data and measured '
+            'data are never drawn without saying which is which.')
+        self.cmb_view.currentIndexChanged.connect(lambda _i: self._draw())
+        bar.addWidget(self.cmb_view)
+        self.lbl_state = QtWidgets.QLabel('')
+        self.lbl_state.setObjectName('state')
+        bar.addWidget(self.lbl_state)
+        bar.addStretch(1)
+        hv.addLayout(bar)
+
+        self.fig = Figure(figsize=(11, 5.4), facecolor='white')
         self.canvas = Canvas(self.fig)
-        hv.addWidget(self.canvas)
+        hv.addWidget(self.canvas, 1)
         split.addWidget(holder)
 
         self.tabs = QtWidgets.QTabWidget()
@@ -566,6 +629,68 @@ class Main(QtWidgets.QMainWindow):
         split.setSizes([560, 330])
         return split
 
+    # -------------------------------------------------- reference planes --
+    def add_plane(self):
+        """A surface, given either as a plane or by its pole. Any number may
+        be entered; one of them can drive the back-tilt."""
+        vals = []
+        for e in self.pl_fields:
+            try:
+                vals.append(float(e.text().strip()))
+            except ValueError:
+                QtWidgets.QMessageBox.warning(
+                    self, 'pyTENSOR', 'Two numbers are needed.')
+                return
+        kind = self.cmb_ptype.currentText()
+        if kind == 'plane':
+            dipaz, dip = vals[0] % 360.0, vals[1]
+        else:                                   # a pole names its own plane
+            dipaz, dip = (vals[0] + 180.0) % 360.0, 90.0 - vals[1]
+        if not 0 <= dip <= 90:
+            QtWidgets.QMessageBox.warning(
+                self, 'pyTENSOR', 'That gives a dip of %.0f degrees.' % dip)
+            return
+        self.planes.append(dict(kind=kind, a=vals[0], b=vals[1],
+                                dipaz=dipaz, dip=dip,
+                                ref=not any(p['ref'] for p in self.planes)))
+        for e in self.pl_fields:
+            e.clear()
+        self.pl_fields[0].setFocus()
+        self._refresh_planes()
+
+    def remove_plane(self):
+        i = self.list_planes.currentRow()
+        if 0 <= i < len(self.planes):
+            was_ref = self.planes[i]['ref']
+            del self.planes[i]
+            if was_ref and self.planes:
+                self.planes[0]['ref'] = True
+            self._refresh_planes()
+
+    def _star_plane(self, item):
+        if item is None:
+            return
+        i = self.list_planes.row(item)
+        for k, p in enumerate(self.planes):
+            p['ref'] = (k == i)
+        self._refresh_planes()
+
+    def _refresh_planes(self):
+        self.list_planes.clear()
+        for p in self.planes:
+            mark = '*' if p['ref'] else ' '
+            self.list_planes.addItem(
+                '%s %-5s %03.0f / %02.0f   -> plane %03.0f/%02.0f'
+                % (mark, p['kind'], p['a'], p['b'], p['dipaz'], p['dip']))
+        self._bt_changed()
+
+    def ref_plane(self):
+        """The surface marked as the back-tilt reference, if any."""
+        for p in self.planes:
+            if p['ref']:
+                return (p['dipaz'], p['dip'])
+        return None
+
     # --------------------------------------------------------- back-tilt --
     def _bt_changed(self, *_a):
         """Read the back-tilt fields and work out the rotation.
@@ -577,13 +702,11 @@ class Main(QtWidgets.QMainWindow):
         exactly which rotation is in force.
         """
         mode = self.cmb_bt.currentIndex()
-        labels = {0: ('', '', ''),
-                  1: ('dip azimuth', 'dip', ''),
-                  2: ('pole trend', 'pole plunge', ''),
-                  3: ('axis trend', 'axis plunge', 'angle')}[mode]
+        use_axis = (mode == 2)
         vals = []
-        for e, lab in zip(self.bt_fields, labels):
-            e.setEnabled(bool(lab))
+        for e, lab in zip(self.bt_fields,
+                          ('axis trend', 'axis plunge', 'angle')):
+            e.setEnabled(use_axis)
             e.setToolTip(lab)
             txt = e.text().strip()
             try:
@@ -592,25 +715,21 @@ class Main(QtWidgets.QMainWindow):
                 vals.append(None)
 
         self.rot = None
-        self.reference = None          # the surface itself, for drawing
         note = ''
-        if mode == 1 and vals[0] is not None and vals[1] is not None:
-            self.reference = (vals[0], vals[1])
-            self.rot = rotate.restores_to_horizontal(vals[0], vals[1])
-            note = 'restores that plane to horizontal'
-        elif mode == 2 and vals[0] is not None and vals[1] is not None:
-            dipaz = (vals[0] + 180.0) % 360.0
-            dip = 90.0 - vals[1]
-            self.reference = (dipaz, dip)
-            self.rot = rotate.restores_to_horizontal(dipaz, dip)
-            note = 'pole implies a plane %03.0f/%02.0f' % (dipaz, dip)
-        elif mode == 3 and all(v is not None for v in vals):
+        ref = self.ref_plane()
+        if mode == 1:
+            if ref is None:
+                note = 'add a surface above and mark it as the reference'
+            else:
+                self.rot = rotate.restores_to_horizontal(*ref)
+                note = 'restores the starred surface to horizontal'
+        elif use_axis and all(v is not None for v in vals):
             self.rot = (vals[0], vals[1], vals[2])
             note = 'right-hand rule about the axis'
 
         if self.rot is None:
             self.lbl_bt.setText('off' if mode == 0
-                                else 'fill the fields to apply a rotation')
+                                else note or 'fill the fields to rotate')
         else:
             t, p, a = self.rot
             self.lbl_bt.setText(
@@ -660,16 +779,19 @@ class Main(QtWidgets.QMainWindow):
         return entry.records_to_arrays(self.records)
 
     def reference_now(self, rotated):
-        """The reference surface, optionally carried through the rotation so
-        a correct restoration is visible as the dashed circle flattening."""
-        ref = getattr(self, 'reference', None)
-        if ref is None:
+        """Every entered surface, optionally carried through the rotation so a
+        correct restoration is visible as the dashed circle flattening."""
+        if not self.planes:
             return None
-        if not rotated or not self.rot:
-            return ref
-        nvec = core.normal_from_dipaz(ref[0], ref[1])
-        nvec = rotate.rotate_vectors(np.atleast_2d(nvec), *self.rot)[0]
-        return plot.reference_from_vectors(nvec)
+        out = []
+        for p in self.planes:
+            az, dp = p['dipaz'], p['dip']
+            if rotated and self.rot:
+                nv = core.normal_from_dipaz(az, dp)
+                nv = rotate.rotate_vectors(np.atleast_2d(nv), *self.rot)[0]
+                az, dp = plot.reference_from_vectors(nv)
+            out.append((az, dp, p['ref']))
+        return out
 
     @property
     def confidence(self):
@@ -936,11 +1058,30 @@ class Main(QtWidgets.QMainWindow):
         conf, sides = self.confidence, self.sides
         keys = [k for k in ('A', 'B') if k in self.results]
         want_fit = bool(keys) and self.cb_fit.isChecked()
-        # with a rotation in force, show BEFORE and AFTER so the axes can be
-        # checked against horizontal and vertical rather than taken on trust
-        show_raw = bool(self.rot) and 'RAW' in self.results
-        panels = max(len(keys) + (1 if want_fit else 0)
-                     + (1 if show_raw else 0), 1)
+
+        # Which state is on screen. With no rotation there is only one, and
+        # the selector is forced to it so the label can never lie.
+        if not self.rot:
+            self.cmb_view.setEnabled(False)
+            self.cmb_view.setCurrentIndex(0)
+            view = 0
+            self.lbl_state.setText('')
+        else:
+            self.cmb_view.setEnabled(True)
+            view = self.cmb_view.currentIndex()
+            t, p, a = self.rot
+            self.lbl_state.setText('rotation in force:  axis %03.0f / %02.0f'
+                                   '   angle %+.1f%s' % (t, p, a, DEG))
+        raw_avail = 'RAW' in self.results
+
+        show_raw = bool(self.rot) and view in (0, 2) and raw_avail
+        show_rot = (not self.rot) or view in (1, 2)
+        if self.rot and view == 0 and not raw_avail:
+            show_raw, show_rot = False, True   # nothing measured yet, be clear
+
+        panels = max((1 if show_raw else 0)
+                     + (len(keys) if show_rot else 0)
+                     + (1 if (want_fit and show_rot) else 0), 1)
         col = [0]
 
         def cell():
@@ -949,13 +1090,24 @@ class Main(QtWidgets.QMainWindow):
             ax.set_facecolor(plot.PAPER)
             return ax
 
+        rot_tag = ''
+        if self.rot:
+            t, p, a = self.rot
+            rot_tag = '  %03.0f/%02.0f %+.0f' % (t, p, a)
+
         if not keys:
             ax = cell()
-            plot.plot_site(ax, n, s, None, certainty=conf, sides=sides,
-                           site_code=self.plot_name,
-                           reference=self.reference_now(True),
-                           header=retro.translate('observed')
-                           if getattr(self, 'retro', False) else 'observed')
+            show_rotated = bool(self.rot) and view != 0
+            plot.plot_site(
+                ax, n if show_rotated else self.n_s_raw[0],
+                s if show_rotated else self.n_s_raw[1],
+                None, certainty=conf, sides=sides,
+                site_code=self.plot_name if show_rotated else self.site_name,
+                reference=self.reference_now(show_rotated),
+                header=('BACK-TILTED' + rot_tag) if show_rotated
+                else ('AS MEASURED  no rotation' if self.rot
+                      else (retro.translate('observed')
+                            if getattr(self, 'retro', False) else 'observed')))
         else:
             if show_raw:
                 rn, rs = self.n_s_raw
@@ -964,25 +1116,27 @@ class Main(QtWidgets.QMainWindow):
                                certainty=conf, sides=sides,
                                site_code=self.site_name,
                                reference=self.reference_now(False),
-                               header='as measured')
+                               header='AS MEASURED  no rotation')
                 if annotate:
                     plot.annotate_result(ax, self.results['RAW'],
                                          n_data=len(self.records))
-            for k in keys:
-                ax = cell()
-                r = self.results[k]
-                plot.plot_site(ax, n, s, r, certainty=conf, sides=sides,
-                               site_code=self.plot_name,
-                               reference=self.reference_now(True),
-                               header=('restored, %s' % NAME[k]) if show_raw
-                               else NAME[k])
-                if annotate:
-                    plot.annotate_result(ax, r, n_data=len(self.records))
-            if want_fit:
-                ax = cell()
-                plot.plot_fitted(ax, n, self.results[keys[0]]['T'],
-                                 site_code=self.plot_name,
-                                 header='fitted shear')
+            if show_rot:
+                for k in keys:
+                    ax = cell()
+                    r = self.results[k]
+                    plot.plot_site(ax, n, s, r, certainty=conf, sides=sides,
+                                   site_code=self.plot_name,
+                                   reference=self.reference_now(True),
+                                   header=(('BACK-TILTED' + rot_tag + '   '
+                                            + NAME[k]) if self.rot
+                                           else NAME[k]))
+                    if annotate:
+                        plot.annotate_result(ax, r, n_data=len(self.records))
+                if want_fit:
+                    ax = cell()
+                    plot.plot_fitted(ax, n, self.results[keys[0]]['T'],
+                                     site_code=self.plot_name,
+                                     header='fitted shear')
         self.fig.subplots_adjust(left=0.01, right=0.99, top=0.99,
                                  bottom=0.14 if annotate else 0.06,
                                  wspace=0.02)

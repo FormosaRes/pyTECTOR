@@ -17,8 +17,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
 
-from pytensor import (core, entry, invdir, modern, plot, report, tensorfile,
-                      hpgl)
+from pytensor import (core, entry, invdir, modern, penrec, plot, report,
+                      tensorfile, hpgl)
 from pytensor.ui_style import QSS
 
 fails = []
@@ -49,7 +49,7 @@ src = open(os.path.join(ROOT, 'pyTENSOR.py'), encoding='utf-8').read()
 tree = ast.parse(src)
 mods = {'core': core, 'entry': entry, 'invdir': invdir, 'modern': modern,
         'plot': plot, 'report': report, 'tensorfile': tensorfile,
-        'hpgl': hpgl}
+        'hpgl': hpgl, 'penrec': penrec}
 missing = set()
 for node in ast.walk(tree):
     if (isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
@@ -121,20 +121,30 @@ ok(tensorfile.parse_result_line(back) is not None,
 p = tensorfile.parse_result_line(back)
 ok(abs(p['phi'] - A['phi']) < 0.001, 'round trip keeps PHI')
 
-print('\n6. HPGL export path')
-w = hpgl.Writer()
-t = np.linspace(0, 2 * np.pi, 361)
-w.polyline(np.cos(t), np.sin(t))
-sizes = plot.star_sizes(A['phi'], A['eigenvalues'])
-for i, key in enumerate(('sigma1', 'sigma2', 'sigma3')):
-    v = core.vec_from_trend_plunge(*A[key])
-    X, Y = plot.schmidt(v[None, :])
-    px, py = plot.star_polygon(float(X[0]), float(Y[0]), plot.STAR_POINTS[i],
-                               float(sizes[i]), inner=plot.STAR_INNER[i],
-                               phase_deg=plot.STAR_PHASE[i])
-    w.polyline(np.append(px, px[0]), np.append(py, py[0]))
-polys, labels, _ = hpgl.parse(w.dumps())
-ok(len(polys) >= 4, 'HPGL export round trips (%d polylines)' % len(polys))
+print("\n6. HPGL export draws the whole plot, at the archive's own scale")
+# The export replays plot.plot_site into a recorder, so it cannot quietly lose
+# elements the way the separate, shorter routine it replaced did.
+rec = penrec.Recorder()
+plot.plot_site(rec, n, s, A, certainty=['C'] * len(n), site_code='01',
+               header='INVDIR', reference=[(90.0, 30.0, True)])
+ok(not rec.ignored, 'no Axes call was silently skipped %s'
+   % (sorted(rec.ignored) if rec.ignored else ''))
+polys, labels, cmds = hpgl.parse(rec.emit(hpgl.Writer()).dumps())
+ok(len(polys) > 100, 'the whole figure is exported, not just the outline '
+   '(%d polylines)' % len(polys))
+ok(len(labels) == 3, 'site code, header and program tag all reach the file')
+
+# The frame is the one thing at a fixed place in every archive HPGL, so its
+# four edges pin both the scale and the origin. Identical to four decimals in
+# all 93 archive files:  x 400 .. 5420,  y 396 .. 5928.
+allpts = np.vstack([a for _pen, a in polys])
+for got, want, what in ((allpts[:, 0].min(), 400, 'left'),
+                        (allpts[:, 0].max(), 5420, 'right'),
+                        (allpts[:, 1].min(), 396, 'bottom'),
+                        (allpts[:, 1].max(), 5928, 'top')):
+    ok(abs(got - want) <= 2,
+       'frame %-6s at %5.0f plotter units, archive has %d' % (what, got, want))
+ok('SI' in cmds and 'DI' in cmds, 'character size and direction are set')
 
 print('\n%d failures' % len(fails))
 sys.exit(1 if fails else 0)

@@ -56,9 +56,28 @@ ARROW_SHAFT_HALF = 0.051
 #: Frame furniture, measured stroke by stroke off the archive HPGL
 #: (see dump_first.py). All distances are in units of the primitive radius.
 #: The box is a PORTRAIT RECTANGLE, not a square.
-FRAME_W = 1.2528        # half width
-FRAME_H = 1.4570        # half height
-FRAME = FRAME_W         # kept for callers that want a single number
+#: The box is NOT symmetric about the centre of the stereogram: it stands
+#: taller above than below, because the site code goes above the circle and
+#: the captions go outside the box underneath it. These four edges are
+#: identical to four decimal places in all 93 archive HPGL files. An earlier
+#: pass took the box to be symmetric at +-FRAME_H, which put the bottom edge
+#: 0.15 radii too low.
+FRAME_L = -1.2527
+FRAME_R = 1.2547
+FRAME_B = -1.3047
+FRAME_T = 1.4585
+FRAME_W = 1.2528        # half width, for callers that want a single number
+FRAME_H = FRAME_T       # top edge, the taller of the two
+FRAME = FRAME_W
+
+#: Caption and site-code anchors, from the same files. The originals set every
+#: one of these left aligned at a fixed column, so they are reproduced that way
+#: rather than centred: '01' sits left of the middle in Angelier's own plots.
+CAPTION_Y = -1.4046     # below the box, outside it
+HEADER_X = -1.2527      # flush with the left edge
+PROGRAM_X = 0.5415
+SITE_X = -0.4076
+SITE_Y = 1.3047
 
 TICK_IN = 1.0000        # cardinal ticks run OUTWARD from the circle only
 TICK_OUT = 1.1019
@@ -329,12 +348,12 @@ def draw_frame(ax, declination=None, box=True):
     _letter(ax, LETTER_M, MAGNETIC_LETTER_X)
 
     if box:
-        ax.plot([-FRAME_W, FRAME_W, FRAME_W, -FRAME_W, -FRAME_W],
-                [-FRAME_H, -FRAME_H, FRAME_H, FRAME_H, -FRAME_H],
+        ax.plot([FRAME_L, FRAME_R, FRAME_R, FRAME_L, FRAME_L],
+                [FRAME_B, FRAME_B, FRAME_T, FRAME_T, FRAME_B],
                 color=PEN, lw=STROKE, zorder=6, antialiased=AA)
 
-    ax.set_xlim(-FRAME_W * 1.03, FRAME_W * 1.03)
-    ax.set_ylim(-FRAME_H * 1.03, FRAME_H * 1.03)
+    ax.set_xlim(FRAME_L * 1.06, FRAME_R * 1.06)
+    ax.set_ylim(CAPTION_Y * 1.14, FRAME_T * 1.04)
     ax.set_aspect('equal')
     ax.axis('off')
 
@@ -409,13 +428,13 @@ def plot_site(ax, n, s, result=None, certainty=None, sides=None,
         _regime_arrows(ax, result)
 
     if site_code:
-        ax.text(0, FRAME_H * 0.90, str(site_code), ha='center', va='center',
+        ax.text(SITE_X, SITE_Y, str(site_code), ha='left', va='center',
                 fontsize=9, family='monospace')
     if header:
-        ax.text(-FRAME_W, -FRAME_H * 1.05, str(header), ha='left', va='top',
+        ax.text(HEADER_X, CAPTION_Y, str(header), ha='left', va='baseline',
                 fontsize=8, family='monospace')
     if program:
-        ax.text(FRAME_W, -FRAME_H * 1.05, str(program), ha='right', va='top',
+        ax.text(PROGRAM_X, CAPTION_Y, str(program), ha='left', va='baseline',
                 fontsize=8, family='monospace')
 
 
@@ -449,6 +468,56 @@ def plot_reference(ax, dipaz_deg, dip_deg, is_ref=False, lw=None,
                 markerfacecolor=PAPER, markeredgecolor=PEN,
                 mew=lw * (1.25 if is_ref else 1.0), linestyle='none',
                 zorder=zorder + 1, antialiased=AA)
+
+
+#: The carried axes are the one thing on these diagrams that is NOT part of
+#: Angelier's style, so they are drawn in a way no original plot ever used: a
+#: thin open ring with a dashed trailing arc. Nothing is mistakable for a star.
+CARRY_MS = (9.0, 7.6, 6.4)
+
+
+def plot_carried_axes(ax, carried, target=None, lw=None, zorder=8):
+    """Where the measured stress axes land when the rotation is applied to
+    them: open rings, with a dashed arc back to the re-inverted answer.
+
+    This exists because a back-tilted diagram on its own does not show you the
+    tilting. The axes are simply somewhere else, and nothing on the page says
+    where they came from. The ring is that missing information.
+
+    Ring and star need not coincide. S4 is rotation invariant, so its exact
+    minimum rotates with the data and the two land on top of each other.
+    INVDIR does not: Angelier's parametrisation pins the tensor's DIAGONAL to
+    cos(psi), cos(psi + 2pi/3), cos(psi + 4pi/3) in the geographic frame, a
+    four-parameter family that is a different family once the data are turned.
+    So for INVDIR the gap between ring and star is the part of the change that
+    comes from the method rather than from the tilting, and it is not small: on
+    the fourteen back-tilt pairs in the Chingshuichi archive, run by the
+    original program itself, the median separation is 10 degrees on sigma1 and
+    about 24 degrees on sigma2 and sigma3.
+    """
+    lw = STROKE if lw is None else lw
+    for i, key in enumerate(('sigma1', 'sigma2', 'sigma3')):
+        v = vec_from_trend_plunge(*carried[key])
+        X, Y = schmidt(v[None, :])
+        ax.plot(X, Y, marker='o', ms=CARRY_MS[i], markerfacecolor='none',
+                markeredgecolor=PEN, mew=lw * 0.9, linestyle='none',
+                zorder=zorder, antialiased=AA)
+        if target is None:
+            continue
+        w = vec_from_trend_plunge(*target[key])
+        if float(v @ w) < 0:
+            w = -w                    # an axis has no head, so take the short way
+        c = float(np.clip(v @ w, -1.0, 1.0))
+        if c > 0.99995:
+            continue                  # they coincide; an arc would just be noise
+        # slerp. Every point is a positive mix of two lower-hemisphere ends, so
+        # the arc stays in the lower hemisphere and never has to be split.
+        th = np.arccos(c)
+        t = np.linspace(0.0, 1.0, 24)[:, None]
+        p = (np.sin((1 - t) * th) * v + np.sin(t * th) * w) / np.sin(th)
+        X, Y = schmidt(p)
+        ax.plot(X, Y, color=PEN, lw=lw * 0.7, linestyle=(0, (2, 2)),
+                zorder=zorder - 1, antialiased=AA)
 
 
 def reference_from_vectors(nvec):

@@ -35,8 +35,8 @@ matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 
-from pytensor import (about, core, entry, invdir, modern, plot, report, retro,
-                      rotate, splash, tensorfile, tilt, tiltui)
+from pytensor import (about, backtilt, core, entry, hpgl, invdir, modern,
+                      penrec, plot, report, retro, splash, tensorfile)
 from pytensor.ui_style import QSS, MUTED
 
 AXES = ('sigma1', 'sigma2', 'sigma3')
@@ -79,25 +79,15 @@ class Worker(QtCore.QThread):
     failed = QtCore.pyqtSignal(str)
 
     def __init__(self, n, s, do_a, do_b, n_pass, lam_printed=None,
-                 raw=None, parent=None):
+                 parent=None):
         super(Worker, self).__init__(parent)
         self.n, self.s = n, s
-        #: the data BEFORE back-tilting, when a rotation is in force. Both are
-        #: inverted so the two can be compared and the axes checked against
-        #: horizontal and vertical.
-        self.raw = raw
         self.do_a, self.do_b, self.n_pass = do_a, do_b, n_pass
         self.lam_printed = lam_printed
 
     def run(self):
         try:
             out = {}
-            if self.raw is not None:
-                rn, rs = self.raw
-                T0 = invdir.run(rn, rs, n_pass=self.n_pass)['T']
-                res0 = core.summary(T0, rn, rs)
-                res0['T'] = T0
-                out['RAW'] = res0
             if self.do_a:
                 r = invdir.run(self.n, self.s, n_pass=self.n_pass,
                                lam_printed=self.lam_printed)
@@ -328,7 +318,7 @@ class Main(QtWidgets.QMainWindow):
         self.records = []
         self.results = {}
         self.archive = None
-        self.rot = None
+        self.bt_window = None
         self.planes = []
         self._loading = False
         self.site_name = '01'
@@ -339,10 +329,6 @@ class Main(QtWidgets.QMainWindow):
 
     @property
     def plot_name(self):
-        """Site label, carrying the rotation when one is applied, in the same
-        form the archive folders use."""
-        if self.rot:
-            return '%s %s' % (self.site_name, rotate.describe(*self.rot))
         return self.site_name
 
     # ------------------------------------------------------------ layout --
@@ -417,6 +403,13 @@ class Main(QtWidgets.QMainWindow):
         self.btn_run.setToolTip('Ctrl+Enter')
         self.btn_run.clicked.connect(self.invert)
         tb.addWidget(self.btn_run)
+        # Back-tilting has a window of its own. This window shows the data as
+        # measured and nothing else, so a stereogram here never needs a caption
+        # to say which orientation it is in.
+        act = tb.addAction('Back-tilt')
+        act.setToolTip('Restore a tilted site in a separate window, measured '
+                       'and restored side by side.')
+        act.triggered.connect(self.open_backtilt)
         tb.addSeparator()
         tb.addAction('Save PNG').triggered.connect(self.save_png)
         tb.addAction('Save HPGL').triggered.connect(self.save_hpgl)
@@ -506,8 +499,9 @@ class Main(QtWidgets.QMainWindow):
         self.list_planes = QtWidgets.QListWidget()
         self.list_planes.setMaximumHeight(84)
         self.list_planes.setToolTip(
-            'Double-click a surface to make it the back-tilt reference. '
-            'It is then drawn with a longer dash.')
+            'Double-click a surface to make it the back-tilt reference. It is '
+            'then drawn with a longer dash, and the back-tilt window offers to '
+            'restore it to horizontal.')
         self.list_planes.itemDoubleClicked.connect(self._star_plane)
         v.addWidget(self.list_planes)
         self._ptype_changed()
@@ -523,46 +517,6 @@ class Main(QtWidgets.QMainWindow):
         row.addWidget(b)
         row.addStretch(1)
         v.addLayout(row)
-
-        v.addSpacing(4)
-        v.addWidget(rule())
-        v.addSpacing(4)
-        v.addWidget(heading('back-tilt'))
-        self.cmb_bt = QtWidgets.QComboBox()
-        self.cmb_bt.addItems(['off',
-                              'restore the reference surface',
-                              'rotation axis   trend / plunge / angle'])
-        self.cmb_bt.currentIndexChanged.connect(self._bt_changed)
-        v.addWidget(self.cmb_bt)
-
-        row = QtWidgets.QHBoxLayout()
-        row.setSpacing(3)
-        self.bt_fields = []
-        for hint in ('020', '00', '-20'):
-            e = QtWidgets.QLineEdit()
-            e.setObjectName('seg')
-            e.setFixedWidth(58)
-            e.setAlignment(QtCore.Qt.AlignCenter)
-            e.setPlaceholderText(hint)
-            e.textEdited.connect(lambda _t: self._bt_changed())
-            self.bt_fields.append(e)
-            row.addWidget(e)
-        row.addStretch(1)
-        v.addLayout(row)
-
-        self.lbl_bt = QtWidgets.QLabel('')
-        self.lbl_bt.setObjectName('legend')
-        self.lbl_bt.setWordWrap(True)
-        v.addWidget(self.lbl_bt)
-
-        self.btn_tilt = QtWidgets.QPushButton('Tilt test')
-        self.btn_tilt.setEnabled(False)
-        self.btn_tilt.setToolTip(
-            'Invert at every partial restoration from 0 to 125 per cent and '
-            'plot both diagnostics, so syn-tilt faulting shows up as a best '
-            'answer short of full restoration.')
-        self.btn_tilt.clicked.connect(self.tilt_test)
-        v.addWidget(self.btn_tilt)
 
         v.addSpacing(4)
         v.addWidget(rule())
@@ -625,16 +579,6 @@ class Main(QtWidgets.QMainWindow):
         self.lbl_stale.setObjectName('stale')
         self.lbl_stale.hide()
         bar.addWidget(self.lbl_stale)
-        self.cmb_view = QtWidgets.QComboBox()
-        self.cmb_view.addItems(['AS MEASURED', 'BACK-TILTED', 'BOTH'])
-        self.cmb_view.setToolTip(
-            'Which data the stereogram shows. Back-tilted data and measured '
-            'data are never drawn without saying which is which.')
-        self.cmb_view.currentIndexChanged.connect(lambda _i: self._draw())
-        bar.addWidget(self.cmb_view)
-        self.lbl_state = QtWidgets.QLabel('')
-        self.lbl_state.setObjectName('state')
-        bar.addWidget(self.lbl_state)
         hv.addLayout(bar)
 
         self.fig = Figure(figsize=(11, 5.4), facecolor='white')
@@ -650,12 +594,9 @@ class Main(QtWidgets.QMainWindow):
         v.setSpacing(4)
         self.strip_ar = ResultStrip('archive   what the old run recorded')
         self.strip_ar.hide()
-        self.strip_raw = ResultStrip('as measured   no rotation')
-        self.strip_raw.hide()
         self.strip_a = ResultStrip('%s   %s' % (MODES[0][1], MODES[0][3]))
         self.strip_b = ResultStrip('%s   %s' % (MODES[1][1], MODES[1][3]))
         v.addWidget(self.strip_ar)
-        v.addWidget(self.strip_raw)
         v.addWidget(self.strip_a)
         v.addWidget(self.strip_b)
         self.lbl_diff = QtWidgets.QLabel('')
@@ -753,7 +694,7 @@ class Main(QtWidgets.QMainWindow):
             self.list_planes.addItem(
                 '%s %-5s %-9s   dip az %03.0f / %02.0f'
                 % (mark, p['kind'], shown, p['dipaz'], p['dip']))
-        self._bt_changed()
+        self._draw()
 
     def ref_plane(self):
         """The surface marked as the back-tilt reference, if any."""
@@ -763,78 +704,22 @@ class Main(QtWidgets.QMainWindow):
         return None
 
     # --------------------------------------------------------- back-tilt --
-    def _bt_changed(self, *_a):
-        """Read the back-tilt fields and work out the rotation.
+    def open_backtilt(self):
+        """Open the back-tilt window, or raise it if it is already up.
 
-        The reference surface and the ANGLE are the user's calls. There is no
-        analytical solution for the angle: it is found by trying values and
-        looking at the result, which is why the archive folders are named
-        after what was tried. This panel only makes trying quick, and shows
-        exactly which rotation is in force.
+        Deliberately a separate window. Sharing one stereogram between measured
+        and restored data meant its meaning depended on a selector elsewhere on
+        screen, and the measured axes disappeared the moment a rotation was
+        applied. The other window shows both states at once and always says
+        which is which.
         """
-        mode = self.cmb_bt.currentIndex()
-        use_axis = (mode == 2)
-        vals = []
-        for e, lab in zip(self.bt_fields,
-                          ('axis trend', 'axis plunge', 'angle')):
-            e.setEnabled(use_axis)
-            e.setToolTip(lab)
-            txt = e.text().strip()
-            try:
-                vals.append(float(txt) if txt else None)
-            except ValueError:
-                vals.append(None)
-
-        self.rot = None
-        note = ''
-        ref = self.ref_plane()
-        if mode == 1:
-            if ref is None:
-                note = 'add a surface above and mark it as the reference'
-            else:
-                self.rot = rotate.restores_to_horizontal(*ref)
-                note = 'restores the starred surface to horizontal'
-        elif use_axis and all(v is not None for v in vals):
-            self.rot = (vals[0], vals[1], vals[2])
-            note = 'right-hand rule about the axis'
-
-        if self.rot is None:
-            self.lbl_bt.setText('off' if mode == 0
-                                else note or 'fill the fields to rotate')
+        if getattr(self, 'bt_window', None) is None:
+            self.bt_window = backtilt.BackTiltWindow(self)
         else:
-            t, p, a = self.rot
-            self.lbl_bt.setText(
-                'axis %03.0f / %02.0f, angle %+.0f%s   %s\n%s'
-                % (t, p, a, DEG, note, rotate.describe(t, p, a)))
-        if hasattr(self, 'btn_tilt'):
-            self.btn_tilt.setEnabled(bool(self.rot)
-                                     and len(self.records) >= 4)
-        self.results = {}
-        for s in (self.strip_a, self.strip_b):
-            s.clear()
-        self.strip_raw.hide()
-        self.lbl_diff.setText('')
-        self.txt_info.clear()
-        self.txt_mohr.clear()
-        self._draw()
-
-    def tilt_test(self):
-        if not self.rot or len(self.records) < 4:
-            return
-        n, s = self.n_s_raw
-        dlg = tiltui.TiltDialog(n, s, self.rot, self.sp_pass.value(), self)
-        dlg.adopt.connect(self._adopt_rotation)
-        dlg.exec_()
-
-    def _adopt_rotation(self, trend, plunge, angle):
-        """Switch the panel to the explicit axis so the chosen partial
-        restoration is what is applied, and is visible."""
-        self.cmb_bt.setCurrentIndex(3)
-        for e, val in zip(self.bt_fields, (trend, plunge, angle)):
-            e.setText('%.4g' % val)
-        self._bt_changed()
-        self.status.showMessage('back-tilt set to %+.1f deg about %03.0f/%02.0f'
-                                % (angle, trend, plunge))
+            self.bt_window.reload()
+        self.bt_window.show()
+        self.bt_window.raise_()
+        self.bt_window.activateWindow()
 
     # -------------------------------------------------------------- data --
     @property
@@ -846,31 +731,15 @@ class Main(QtWidgets.QMainWindow):
 
     @property
     def n_s(self):
-        """Fault normals and slips, back-tilted if a rotation is in force."""
-        n, s = entry.records_to_arrays(self.active)
-        if getattr(self, 'rot', None) and len(n):
-            n, s = rotate.rotate_site(n, s, *self.rot)
-        return n, s
-
-    @property
-    def n_s_raw(self):
-        """The same data as measured, whatever rotation is in force."""
+        """Fault normals and slips, as measured. This window never rotates
+        anything; that is what the back-tilt window is for."""
         return entry.records_to_arrays(self.active)
 
-    def reference_now(self, rotated):
-        """Every entered surface, optionally carried through the rotation so a
-        correct restoration is visible as the dashed circle flattening."""
+    def reference_now(self):
+        """Every entered surface, for the dashed overlay."""
         if not self.planes:
             return None
-        out = []
-        for p in self.planes:
-            az, dp = p['dipaz'], p['dip']
-            if rotated and self.rot:
-                nv = core.normal_from_dipaz(az, dp)
-                nv = rotate.rotate_vectors(np.atleast_2d(nv), *self.rot)[0]
-                az, dp = plot.reference_from_vectors(nv)
-            out.append((az, dp, p['ref']))
-        return out
+        return [(p['dipaz'], p['dip'], p['ref']) for p in self.planes]
 
     @property
     def confidence(self):
@@ -972,12 +841,9 @@ class Main(QtWidgets.QMainWindow):
         self.lbl_count.setText('%d fault%s' % (used, '' if used == 1 else 's')
                                + ('' if used == total
                                   else '   %d excluded' % (total - used)))
-        if hasattr(self, 'btn_tilt'):
-            self.btn_tilt.setEnabled(bool(self.rot) and used >= 4)
         if not self.results:
             for s in (self.strip_a, self.strip_b):
                 s.clear()
-            self.strip_raw.hide()
             self.lbl_diff.setText('')
             self.txt_info.clear()
             self.txt_mohr.clear()
@@ -1078,8 +944,7 @@ class Main(QtWidgets.QMainWindow):
                else None)
         self.worker = Worker(n, s, self.cb_a.isChecked(),
                              self.cb_b.isChecked(), self.sp_pass.value(),
-                             lam_printed=lam,
-                             raw=self.n_s_raw if self.rot else None)
+                             lam_printed=lam)
         self.worker.done.connect(self._finished)
         self.worker.failed.connect(self._failed)
         self.worker.start()
@@ -1095,57 +960,16 @@ class Main(QtWidgets.QMainWindow):
         self.progress.hide()
         self.results = out
         n = len(self.active)
-        # each strip says which data it describes, so a back-tilted answer is
-        # never read as if it came from the measured orientations
-        tag_txt = (('back-tilted %s' % rotate.describe(*self.rot))
-                   if self.rot else '')
         for tag, strip in (('A', self.strip_a), ('B', self.strip_b)):
-            i = 0 if tag == 'A' else 1
-            strip.title.setText(
-                ('%s   %s' % (MODES[i][1], tag_txt)).upper() if self.rot
-                else ('%s   %s' % (MODES[i][1], MODES[i][3])).upper())
             if tag in out:
                 strip.show_result(out[tag], n)
             else:
                 strip.clear()
-        if 'RAW' in out:
-            self.strip_raw.show()
-            self.strip_raw.show_result(out['RAW'], n)
-        else:
-            self.strip_raw.hide()
         self._result_print = self._fingerprint()
-        self.lbl_diff.setText(self._difference() + self._tilt_note())
+        self.lbl_diff.setText(self._difference())
         self._write_reports()
         self.status.showMessage('done')
         self._draw()
-
-    def _tilt_note(self):
-        """Did the axes actually come back towards horizontal and vertical?
-
-        Restoring the reference surface to horizontal is only correct if the
-        faults predate the tilting. If they formed during it, part of the tilt
-        post-dates them and full restoration over-rotates. So report the
-        Andersonian misfit before and after rather than assuming.
-        """
-        raw = self.results.get('RAW')
-        new = self.results.get('A') or self.results.get('B')
-        if not (raw and new and self.rot):
-            return ''
-        m0, r0, _ = tilt.andersonian(raw)
-        m1, r1, _ = tilt.andersonian(new)
-        txt = ('\nBACK-TILT   as measured  σ₁ %03d/%02d  Φ %.3f  ANG %.1f°  '
-               'Andersonian %.1f° (%s)'
-               % (raw['sigma1'][0], raw['sigma1'][1], raw['phi'],
-                  raw['ANG_mean'], m0, r0))
-        txt += ('\n            restored     σ₁ %03d/%02d  Φ %.3f  ANG %.1f°  '
-                'Andersonian %.1f° (%s)'
-                % (new['sigma1'][0], new['sigma1'][1], new['phi'],
-                   new['ANG_mean'], m1, r1))
-        if m1 > m0 + 2:
-            txt += ('\n            the axes moved AWAY from horizontal and '
-                    'vertical, so this rotation is not supported. Run the '
-                    'tilt test.')
-        return txt
 
     def _difference(self):
         a, b = self.results.get('A'), self.results.get('B')
@@ -1209,7 +1033,7 @@ class Main(QtWidgets.QMainWindow):
         what is on screen no longer describes the current data."""
         return (tuple((r['dipaz'], r['dip'], round(r['rake'], 3),
                        bool(r.get('use', True))) for r in self.records),
-                self.rot, self.sp_pass.value(),
+                self.sp_pass.value(),
                 self.cb_a.isChecked(), self.cb_b.isChecked(),
                 self.cb_lam.isChecked() if self.cb_lam.isEnabled() else None)
 
@@ -1262,29 +1086,7 @@ class Main(QtWidgets.QMainWindow):
             self.canvas.draw()
             return
 
-        # Which state is on screen. With no rotation there is only one, and
-        # the selector is forced to it so the label can never lie.
-        if not self.rot:
-            self.cmb_view.setEnabled(False)
-            self.cmb_view.setCurrentIndex(0)
-            view = 0
-            self.lbl_state.setText('')
-        else:
-            self.cmb_view.setEnabled(True)
-            view = self.cmb_view.currentIndex()
-            t, p, a = self.rot
-            self.lbl_state.setText('rotation in force:  axis %03.0f / %02.0f'
-                                   '   angle %+.1f%s' % (t, p, a, DEG))
-        raw_avail = 'RAW' in self.results
-
-        show_raw = bool(self.rot) and view in (0, 2) and raw_avail
-        show_rot = (not self.rot) or view in (1, 2)
-        if self.rot and view == 0 and not raw_avail:
-            show_raw, show_rot = False, True   # nothing measured yet, be clear
-
-        panels = max((1 if show_raw else 0)
-                     + (len(keys) if show_rot else 0)
-                     + (1 if (want_fit and show_rot) else 0), 1)
+        panels = max(len(keys) + (1 if want_fit else 0), 1)
         col = [0]
         title_colour = '#1E1E1C' if plot.PEN == 'k' else plot.PEN
 
@@ -1301,67 +1103,35 @@ class Main(QtWidgets.QMainWindow):
                              color=title_colour, pad=8, linespacing=1.5)
             return ax
 
-        rot_tag = ''
-        if self.rot:
-            t, p, a = self.rot
-            rot_tag = '  %03.0f/%02.0f %+.0f' % (t, p, a)
         try:
             decl = float(self.ed_decl.text().strip())
         except ValueError:
             decl = plot.MAGNETIC_OFFSET
 
         if not keys:
-            show_rotated = bool(self.rot) and view != 0
-            ax = cell('BACK-TILTED' if show_rotated
-                      else ('AS MEASURED' if self.rot else 'OBSERVED DATA'),
-                      sub=(rot_tag.strip() if show_rotated
-                           else ('rotation not applied here' if self.rot
-                                 else 'not yet inverted')))
+            ax = cell('OBSERVED DATA', 'not yet inverted')
             plot.plot_site(
-                ax, n if show_rotated else self.n_s_raw[0],
-                s if show_rotated else self.n_s_raw[1],
-                None, certainty=conf, sides=sides,
-                site_code=self.plot_name if show_rotated else self.site_name,
-                reference=self.reference_now(show_rotated),
+                ax, n, s, None, certainty=conf, sides=sides,
+                site_code=self.site_name, reference=self.reference_now(),
                 declination=decl,
-                header=('BACK-TILTED' + rot_tag) if show_rotated
-                else ('AS MEASURED  no rotation' if self.rot
-                      else (retro.translate('observed')
-                            if getattr(self, 'retro', False) else 'observed')))
+                header=(retro.translate('observed')
+                        if getattr(self, 'retro', False) else 'observed'))
         else:
-            if show_raw:
-                rn, rs = self.n_s_raw
-                ax = cell('AS MEASURED', 'no rotation applied')
-                plot.plot_site(ax, rn, rs, self.results['RAW'],
-                               certainty=conf, sides=sides,
+            for k in keys:
+                ax = cell(NAME[k], MODES[0 if k == 'A' else 1][3])
+                r = self.results[k]
+                plot.plot_site(ax, n, s, r, certainty=conf, sides=sides,
                                site_code=self.site_name,
-                               reference=self.reference_now(False),
-                               header='AS MEASURED  no rotation', declination=decl)
+                               reference=self.reference_now(),
+                               declination=decl, header=NAME[k])
                 if annotate:
-                    plot.annotate_result(ax, self.results['RAW'],
-                                         n_data=len(self.active))
-            if show_rot:
-                for k in keys:
-                    ax = cell(('BACK-TILTED  ' + NAME[k]) if self.rot
-                              else NAME[k],
-                              (rot_tag.strip() if self.rot
-                               else MODES[0 if k == 'A' else 1][3]))
-                    r = self.results[k]
-                    plot.plot_site(ax, n, s, r, certainty=conf, sides=sides,
-                                   site_code=self.plot_name,
-                                   reference=self.reference_now(True),
-                                   declination=decl,
-                                   header=(('BACK-TILTED' + rot_tag + '   '
-                                            + NAME[k]) if self.rot
-                                           else NAME[k]))
-                    if annotate:
-                        plot.annotate_result(ax, r, n_data=len(self.active))
-                if want_fit:
-                    ax = cell('FITTED SHEAR',
-                              'what the solution predicts on these planes')
-                    plot.plot_fitted(ax, n, self.results[keys[0]]['T'],
-                                     site_code=self.plot_name,
-                                     header='fitted shear', declination=decl)
+                    plot.annotate_result(ax, r, n_data=len(self.active))
+            if want_fit:
+                ax = cell('FITTED SHEAR',
+                          'what the solution predicts on these planes')
+                plot.plot_fitted(ax, n, self.results[keys[0]]['T'],
+                                 site_code=self.site_name,
+                                 header='fitted shear', declination=decl)
         if stale:
             # unmistakable, because acting on an out-of-date stereogram is the
             # kind of mistake that survives all the way into a figure
@@ -1432,8 +1202,7 @@ class Main(QtWidgets.QMainWindow):
             plot.set_palette()
             self.fig.set_facecolor('white')
 
-        for strip in (self.strip_ar, self.strip_raw, self.strip_a,
-                      self.strip_b):
+        for strip in (self.strip_ar, self.strip_a, self.strip_b):
             strip.set_language(self.retro)
         for pan in self.findChildren(Panel):
             pan.set_retro(self.retro)
@@ -1463,36 +1232,36 @@ class Main(QtWidgets.QMainWindow):
             'MODE 1991  —  ' + retro.TITLE if self.retro
             else 'type a record, for example  CS 122 87W 124')
         self._draw()
+        if self.bt_window is not None:
+            self.bt_window.set_palette()
 
     def save_hpgl(self):
-        from pytensor import hpgl
+        """The plot as plotter vectors, in the archive's own dialect.
+
+        Drawn by the same code that draws the screen, replayed into a recorder
+        instead of an Axes, so the file carries everything the figure carries:
+        striae, ticks, centre cross, N and M, the frame, the arrows and the
+        reference surfaces. It used to be a separate shorter routine that
+        emitted only the primitive and the fault planes.
+        """
         fn, _ = QtWidgets.QFileDialog.getSaveFileName(
             self, 'Save HPGL', '%s.hpgl' % self.site_name, 'HPGL (*.hpgl)')
         if not fn:
             return
-        n, _s = self.n_s
-        w = hpgl.Writer()
-        t = np.linspace(0, 2 * np.pi, 721)
-        w.polyline(np.cos(t), np.sin(t))
-        for i in range(len(n)):
-            for seg in plot.great_circle(n[i]):
-                w.polyline(seg[:, 0], seg[:, 1])
-        r = self.results.get('A') or self.results.get('B')
-        if r:
-            sizes = plot.star_sizes(r['phi'], r['eigenvalues'])
-            for i, key in enumerate(AXES):
-                v = core.vec_from_trend_plunge(*r[key])
-                X, Y = plot.schmidt(v[None, :])
-                px, py = plot.star_polygon(float(X[0]), float(Y[0]),
-                                           plot.STAR_POINTS[i],
-                                           float(sizes[i]),
-                                           inner=plot.STAR_INNER[i],
-                                           phase_deg=plot.STAR_PHASE[i])
-                w.polyline(np.append(px, px[0]), np.append(py, py[0]))
-        w.label(-1.25, -1.36, self.plot_name)
-        w.label(0.80, -1.36, 'pyTENSOR')
-        w.save(fn)
-        self.status.showMessage('saved ' + fn)
+        n, s = self.n_s
+        try:
+            decl = float(self.ed_decl.text().strip())
+        except ValueError:
+            decl = plot.MAGNETIC_OFFSET
+        tag, r = self._report_source()
+        rec = penrec.Recorder()
+        plot.plot_site(rec, n, s, r, certainty=self.confidence,
+                       sides=self.sides, site_code=self.site_name,
+                       reference=self.reference_now(), declination=decl,
+                       header=NAME.get(tag, 'observed'))
+        rec.emit(hpgl.Writer()).save(fn)
+        self.status.showMessage('saved %s   %d vectors'
+                                % (fn, len(rec.polylines)))
 
 
 def main():

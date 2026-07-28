@@ -632,9 +632,12 @@ class Main(QtWidgets.QMainWindow):
         v.setSpacing(4)
         self.strip_ar = ResultStrip('archive   what the old run recorded')
         self.strip_ar.hide()
+        self.strip_raw = ResultStrip('as measured   no rotation')
+        self.strip_raw.hide()
         self.strip_a = ResultStrip('%s   %s' % (MODES[0][1], MODES[0][3]))
         self.strip_b = ResultStrip('%s   %s' % (MODES[1][1], MODES[1][3]))
         v.addWidget(self.strip_ar)
+        v.addWidget(self.strip_raw)
         v.addWidget(self.strip_a)
         v.addWidget(self.strip_b)
         self.lbl_diff = QtWidgets.QLabel('')
@@ -791,6 +794,7 @@ class Main(QtWidgets.QMainWindow):
         self.results = {}
         for s in (self.strip_a, self.strip_b):
             s.clear()
+        self.strip_raw.hide()
         self.lbl_diff.setText('')
         self.txt_info.clear()
         self.txt_mohr.clear()
@@ -955,6 +959,7 @@ class Main(QtWidgets.QMainWindow):
         if not self.results:
             for s in (self.strip_a, self.strip_b):
                 s.clear()
+            self.strip_raw.hide()
             self.lbl_diff.setText('')
             self.txt_info.clear()
             self.txt_mohr.clear()
@@ -1071,12 +1076,25 @@ class Main(QtWidgets.QMainWindow):
         self.btn_run.setEnabled(True)
         self.progress.hide()
         self.results = out
-        n = len(self.records)
+        n = len(self.active)
+        # each strip says which data it describes, so a back-tilted answer is
+        # never read as if it came from the measured orientations
+        tag_txt = (('back-tilted %s' % rotate.describe(*self.rot))
+                   if self.rot else '')
         for tag, strip in (('A', self.strip_a), ('B', self.strip_b)):
+            i = 0 if tag == 'A' else 1
+            strip.title.setText(
+                ('%s   %s' % (MODES[i][1], tag_txt)).upper() if self.rot
+                else ('%s   %s' % (MODES[i][1], MODES[i][3])).upper())
             if tag in out:
                 strip.show_result(out[tag], n)
             else:
                 strip.clear()
+        if 'RAW' in out:
+            self.strip_raw.show()
+            self.strip_raw.show_result(out['RAW'], n)
+        else:
+            self.strip_raw.hide()
         self._result_print = self._fingerprint()
         self.lbl_diff.setText(self._difference() + self._tilt_note())
         self._write_reports()
@@ -1396,7 +1414,8 @@ class Main(QtWidgets.QMainWindow):
             plot.set_palette()
             self.fig.set_facecolor('white')
 
-        for strip in (self.strip_ar, self.strip_a, self.strip_b):
+        for strip in (self.strip_ar, self.strip_raw, self.strip_a,
+                      self.strip_b):
             strip.set_language(self.retro)
         for pan in self.findChildren(Panel):
             pan.set_retro(self.retro)

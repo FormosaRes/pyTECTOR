@@ -29,9 +29,10 @@ sides = plot.strike_slip_sign([r['dipaz'] for r in recs],
                               [r['rake'] + 180.0 for r in recs])
 res = core.summary(invdir.run(n, s, n_pass=1)['T'], n, s)
 
-for tag, pen, paper in (('normal', 'k', 'white'),
-                        ('1991', retro.PLOT_PEN, retro.PLOT_PAPER)):
-    plot.set_palette(pen, paper)
+for tag, pen, paper, aa, stroke in (
+        ('normal', 'k', 'white', True, None),
+        ('1991', retro.PLOT_PEN, retro.PLOT_PAPER, False, retro.PLOT_STROKE)):
+    plot.set_palette(pen, paper, aa=aa, stroke=stroke)
     fig = plt.figure(figsize=(5.2, 6.2), facecolor=paper)
     ax = fig.add_subplot(111)
     ax.set_facecolor(paper)

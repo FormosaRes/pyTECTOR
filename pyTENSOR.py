@@ -36,7 +36,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 
 from pytensor import (about, core, entry, invdir, modern, plot, report, retro,
-                      rotate, splash, tensorfile)
+                      rotate, splash, tensorfile, tilt)
 from pytensor.ui_style import QSS, MUTED
 
 AXES = ('sigma1', 'sigma2', 'sigma3')
@@ -69,15 +69,25 @@ class Worker(QtCore.QThread):
     failed = QtCore.pyqtSignal(str)
 
     def __init__(self, n, s, do_a, do_b, n_pass, lam_printed=None,
-                 parent=None):
+                 raw=None, parent=None):
         super(Worker, self).__init__(parent)
         self.n, self.s = n, s
+        #: the data BEFORE back-tilting, when a rotation is in force. Both are
+        #: inverted so the two can be compared and the axes checked against
+        #: horizontal and vertical.
+        self.raw = raw
         self.do_a, self.do_b, self.n_pass = do_a, do_b, n_pass
         self.lam_printed = lam_printed
 
     def run(self):
         try:
             out = {}
+            if self.raw is not None:
+                rn, rs = self.raw
+                T0 = invdir.run(rn, rs, n_pass=self.n_pass)['T']
+                res0 = core.summary(T0, rn, rs)
+                res0['T'] = T0
+                out['RAW'] = res0
             if self.do_a:
                 r = invdir.run(self.n, self.s, n_pass=self.n_pass,
                                lam_printed=self.lam_printed)
@@ -309,6 +319,7 @@ class Main(QtWidgets.QMainWindow):
         self.results = {}
         self.archive = None
         self.rot = None
+        self.reference = None
         self.site_name = '01'
         self.site_code = '01'
         self.archive_lambda = None
@@ -572,13 +583,16 @@ class Main(QtWidgets.QMainWindow):
                 vals.append(None)
 
         self.rot = None
+        self.reference = None          # the surface itself, for drawing
         note = ''
         if mode == 1 and vals[0] is not None and vals[1] is not None:
+            self.reference = (vals[0], vals[1])
             self.rot = rotate.restores_to_horizontal(vals[0], vals[1])
             note = 'restores that plane to horizontal'
         elif mode == 2 and vals[0] is not None and vals[1] is not None:
             dipaz = (vals[0] + 180.0) % 360.0
             dip = 90.0 - vals[1]
+            self.reference = (dipaz, dip)
             self.rot = rotate.restores_to_horizontal(dipaz, dip)
             note = 'pole implies a plane %03.0f/%02.0f' % (dipaz, dip)
         elif mode == 3 and all(v is not None for v in vals):
@@ -609,6 +623,23 @@ class Main(QtWidgets.QMainWindow):
         if getattr(self, 'rot', None) and len(n):
             n, s = rotate.rotate_site(n, s, *self.rot)
         return n, s
+
+    @property
+    def n_s_raw(self):
+        """The same data as measured, whatever rotation is in force."""
+        return entry.records_to_arrays(self.records)
+
+    def reference_now(self, rotated):
+        """The reference surface, optionally carried through the rotation so
+        a correct restoration is visible as the dashed circle flattening."""
+        ref = getattr(self, 'reference', None)
+        if ref is None:
+            return None
+        if not rotated or not self.rot:
+            return ref
+        nvec = core.normal_from_dipaz(ref[0], ref[1])
+        nvec = rotate.rotate_vectors(np.atleast_2d(nvec), *self.rot)[0]
+        return plot.reference_from_vectors(nvec)
 
     @property
     def confidence(self):
@@ -750,7 +781,8 @@ class Main(QtWidgets.QMainWindow):
                else None)
         self.worker = Worker(n, s, self.cb_a.isChecked(),
                              self.cb_b.isChecked(), self.sp_pass.value(),
-                             lam_printed=lam)
+                             lam_printed=lam,
+                             raw=self.n_s_raw if self.rot else None)
         self.worker.done.connect(self._finished)
         self.worker.failed.connect(self._failed)
         self.worker.start()
@@ -771,10 +803,38 @@ class Main(QtWidgets.QMainWindow):
                 strip.show_result(out[tag], n)
             else:
                 strip.clear()
-        self.lbl_diff.setText(self._difference())
+        self.lbl_diff.setText(self._difference() + self._tilt_note())
         self._write_reports()
         self.status.showMessage('done')
         self._draw()
+
+    def _tilt_note(self):
+        """Did the axes actually come back towards horizontal and vertical?
+
+        Restoring the reference surface to horizontal is only correct if the
+        faults predate the tilting. If they formed during it, part of the tilt
+        post-dates them and full restoration over-rotates. So report the
+        Andersonian misfit before and after rather than assuming.
+        """
+        raw = self.results.get('RAW')
+        new = self.results.get('A') or self.results.get('B')
+        if not (raw and new and self.rot):
+            return ''
+        m0, r0, _ = tilt.andersonian(raw)
+        m1, r1, _ = tilt.andersonian(new)
+        txt = ('\nBACK-TILT   as measured  σ₁ %03d/%02d  Φ %.3f  ANG %.1f°  '
+               'Andersonian %.1f° (%s)'
+               % (raw['sigma1'][0], raw['sigma1'][1], raw['phi'],
+                  raw['ANG_mean'], m0, r0))
+        txt += ('\n            restored     σ₁ %03d/%02d  Φ %.3f  ANG %.1f°  '
+                'Andersonian %.1f° (%s)'
+                % (new['sigma1'][0], new['sigma1'][1], new['phi'],
+                   new['ANG_mean'], m1, r1))
+        if m1 > m0 + 2:
+            txt += ('\n            the axes moved AWAY from horizontal and '
+                    'vertical, so this rotation is not supported. Run the '
+                    'tilt test.')
+        return txt
 
     def _difference(self):
         a, b = self.results.get('A'), self.results.get('B')
@@ -840,33 +900,53 @@ class Main(QtWidgets.QMainWindow):
         they do get the numbers."""
         self.fig.clear()
         n, s = self.n_s
-        keys = [k for k in ('A', 'B') if k in self.results]
         conf, sides = self.confidence, self.sides
+        keys = [k for k in ('A', 'B') if k in self.results]
         want_fit = bool(keys) and self.cb_fit.isChecked()
-        panels = max(len(keys) + (1 if want_fit else 0), 1)
+        # with a rotation in force, show BEFORE and AFTER so the axes can be
+        # checked against horizontal and vertical rather than taken on trust
+        show_raw = bool(self.rot) and 'RAW' in self.results
+        panels = max(len(keys) + (1 if want_fit else 0)
+                     + (1 if show_raw else 0), 1)
+        col = [0]
 
-        for ax in self.fig.get_axes():
+        def cell():
+            col[0] += 1
+            ax = self.fig.add_subplot(1, panels, col[0])
             ax.set_facecolor(plot.PAPER)
+            return ax
 
         if not keys:
-            ax = self.fig.add_subplot(111)
-            ax.set_facecolor(plot.PAPER)
+            ax = cell()
             plot.plot_site(ax, n, s, None, certainty=conf, sides=sides,
                            site_code=self.plot_name,
+                           reference=self.reference_now(True),
                            header=retro.translate('observed')
                            if getattr(self, 'retro', False) else 'observed')
         else:
-            for i, k in enumerate(keys):
-                ax = self.fig.add_subplot(1, panels, i + 1)
-                ax.set_facecolor(plot.PAPER)
+            if show_raw:
+                rn, rs = self.n_s_raw
+                ax = cell()
+                plot.plot_site(ax, rn, rs, self.results['RAW'],
+                               certainty=conf, sides=sides,
+                               site_code=self.site_name,
+                               reference=self.reference_now(False),
+                               header='as measured')
+                if annotate:
+                    plot.annotate_result(ax, self.results['RAW'],
+                                         n_data=len(self.records))
+            for k in keys:
+                ax = cell()
                 r = self.results[k]
                 plot.plot_site(ax, n, s, r, certainty=conf, sides=sides,
-                               site_code=self.plot_name, header=NAME[k])
+                               site_code=self.plot_name,
+                               reference=self.reference_now(True),
+                               header=('restored, %s' % NAME[k]) if show_raw
+                               else NAME[k])
                 if annotate:
                     plot.annotate_result(ax, r, n_data=len(self.records))
             if want_fit:
-                ax = self.fig.add_subplot(1, panels, panels)
-                ax.set_facecolor(plot.PAPER)
+                ax = cell()
                 plot.plot_fitted(ax, n, self.results[keys[0]]['T'],
                                  site_code=self.plot_name,
                                  header='fitted shear')

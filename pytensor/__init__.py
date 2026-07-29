@@ -9,7 +9,7 @@ Two modes:
 
 Named in tribute to the original.
 """
-__version__ = '0.1.0'
+__version__ = '0.2.0'
 
 from . import core, invdir, modern, tensorfile          # noqa: F401
 from .core import LAMBDA, describe, estimators, summary, S4   # noqa: F401

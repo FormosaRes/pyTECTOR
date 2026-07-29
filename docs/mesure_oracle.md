@@ -212,6 +212,31 @@ mean RUP 16.1, n = 5.
   programs named: DIEDRE (P-T dihedra), CONJUG (conjugate systems), and the
   post-processors ANATEN, TRIAGE, DIMOHR.
 
+# VISION: the screen display (2026-07-29)
+
+The same machine has a program named VISION that draws the plot on screen,
+and the user photographed it displaying the L12-2 diagram. Rendered side by
+side with the fixture's HPGL file, the two pictures agree element for
+element:
+
+- the five fault great circles bowing east, with their slickenside marks;
+- the stress axes as star outlines with five, four and three branches for
+  sigma1 (255/21, lower left), sigma2 (115/64, right of centre) and
+  sigma3 (351/15, top);
+- the two heavy arrow pairs outside the circle, pointing inward along the
+  sigma1 trend and outward along the sigma3 trend;
+- the north arrow with the N and M flags, M sitting the declination east
+  of N;
+- the site caption along the top edge.
+
+So the suite draws once: DIAGRA computes the picture (its keystroke log is
+`diagra_keys.txt` in the fixture), the plotter gets it as HPGL, and VISION
+puts the identical picture on the screen. The photograph is an independent
+check of the symbol decoding in `pytector/plot.py`, against a real display
+rather than our own reading of the HPGL bytes: the 5/4/3-branch star
+convention, the eigenvalue-scaled star sizes, and the compression /
+extension arrow pairs all match.
+
 ## The fixture is in the repository
 
 The complete `L12-2` run is committed at `tests/fixtures/L12-2/`: the data

@@ -62,6 +62,9 @@ CODE = {k: c for k, _nm, c, _d in MODES}
 #: column by column against the same sites' INFO1, which does print names.
 #: SIGMN and TAU are the Mohr coordinates of the datum, which is what the file
 #: is for.
+#: No %-formatting on these: they contain literal per-cent signs, and applying
+#: the % operator to a string holding "0-200 %," raises at import and the
+#: program never starts. Write the symbols in directly instead.
 MOHR1_KEY = (
     '<b>SIGMN</b> normal stress on the plane &middot; '
     '<b>TAU</b> shear magnitude &middot; '
@@ -69,11 +72,11 @@ MOHR1_KEY = (
     'ANG) &middot; <b>RUP</b> misfit, 0&ndash;200 %, smaller is better '
     '&middot; <b>ANG</b> striation to predicted shear in degrees, smaller is '
     'better. SIGMN and TAU are the point&rsquo;s Mohr coordinates.<br>'
-    '<b>02</b> line: principal values (%s S&sup2; = 3/2) and '
-    '%s = (S2&minus;S3)/(S1&minus;S3). '
+    '<b>02</b> line: principal values (Σ S&sup2; = 3/2) and '
+    'Φ = (S2&minus;S3)/(S1&minus;S3). '
     '<i>Column names are added here for reading; the file itself has none, '
     'and saving is unaffected.</i>'
-) % ('&Sigma;', PHI)
+)
 
 MOHR1_TIP = (
     'MOHR1, five columns per fault, in this order:\n\n'

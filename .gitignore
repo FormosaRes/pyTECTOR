@@ -11,3 +11,8 @@ demo_*.txt
 /INFO1
 /MOHR1
 *.jpg
+
+# build debris
+*.egg-info/
+build/
+dist/

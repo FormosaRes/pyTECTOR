@@ -17,3 +17,8 @@ demo_*.txt
 build/
 dist/
 *.rar
+
+# field data: sessions and saved sites are the user's own measurements and do
+# not belong in a code repository, private or not
+Session/
+*.tec

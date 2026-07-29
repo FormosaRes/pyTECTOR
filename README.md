@@ -4,13 +4,19 @@
 
 **Angelier 古應力反演的 Python 重建版 — TENSOR 5.45 (jan91)**
 
-照論文重寫，不反譯 exe · 92 個原程式 run 逐位驗證 · 回轉與 tilt test · 逐筆影響力診斷 · INFO1／MOHR1／HPGL 原格式輸出
+照論文重寫，不反譯 exe · 原程式 90 個 run 重現 85 個 · 回轉與 tilt test · 逐筆影響力診斷 · INFO1／MOHR1／HPGL 原格式輸出
 
-[![method](https://img.shields.io/badge/method-Angelier%201990-1f6feb)](https://doi.org/10.1111/j.1365-246X.1990.tb01777.x)
+[![TENSOR](https://img.shields.io/badge/TENSOR%205.45-reconstructed-1f6feb)](docs/mesure_oracle.md)
+[![Angelier](https://img.shields.io/badge/Angelier%201990-direct%20inversion-1f6feb)](https://doi.org/10.1111/j.1365-246X.1990.tb01777.x)
 [![version](https://img.shields.io/badge/version-0.3.0-brightgreen)](pyproject.toml)
-[![python](https://img.shields.io/badge/python-3.x%20%2B%20PyQt5-555)](#quick-start)
+
+[![python](https://img.shields.io/badge/python-3.x-555)](#quick-start)
+[![PyQt5](https://img.shields.io/badge/GUI-PyQt5-8250df)](pyTECTOR.py)
+[![archive](https://img.shields.io/badge/archive-85%2F90%20runs%20reproduced-2ea44f)](tests/test_replication.py)
 [![tests](https://img.shields.io/badge/tests-11%20suites-2ea44f)](tests/)
+
 [![fixture](https://img.shields.io/badge/fixture-public%2C%20no%20field%20data-8250df)](tests/fixtures/L12-2/)
+[![output](https://img.shields.io/badge/INFO1%20%2F%20MOHR1%20%2F%20HPGL-byte--identical-2ea44f)](pytector/report.py)
 
 [使用手冊 中文](docs/manual.zh.md) · [English manual](docs/manual.en.md) · [原程式對話全文](docs/mesure_oracle.md) · [English below](#english)
 

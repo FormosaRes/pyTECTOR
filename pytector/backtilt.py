@@ -729,12 +729,8 @@ class BackTiltWindow(QtWidgets.QDialog):
         conf = self.certainty
         # Two separate things have to be redone for the restored panel.
         #
-        # The convention. Where a plane has been turned through the vertical
-        # its pole changes hemisphere, the upward side of the plane becomes the
-        # other block, and the stored slip vector now describes the opposite
-        # movement. Drawn straight, a left-lateral couple comes out
-        # right-lateral. canonicalise() flips those pairs back.
-        rn, rs = rotate.canonicalise(rn, rs)
+        # NOT canonicalised. See rotate.canonicalise: the archive settles it,
+        # and the original kept the rotated slip vector as it came.
         # The side the barb sits on, which is orientation-dependent in its own
         # right and reverses for any datum whose slip passes through pure
         # dip-slip, about 20 per cent of archive data at the usual angles.
@@ -847,8 +843,7 @@ class BackTiltWindow(QtWidgets.QDialog):
             return
 
         rn, rs = ((n, s) if not self.rot
-                  else rotate.canonicalise(*rotate.rotate_site(n, s,
-                                                               *self.rot)))
+                  else rotate.rotate_site(n, s, *self.rot))
         sides, sides_rot = (plot.strike_slip_sign_vectors(n, s),
                             plot.strike_slip_sign_vectors(rn, rs))
         rtag = ('' if not self.rot

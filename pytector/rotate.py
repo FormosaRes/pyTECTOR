@@ -97,20 +97,28 @@ def rotate_site(n, s, trend_deg, plunge_deg, angle_deg):
 
 
 def canonicalise(n, s):
-    """Put a rotated data set back into the convention everything else assumes.
+    """Flip pairs so the normal points up. For WRITING a site file, not for
+    drawing.
 
-    A rotation carries the normal and the slip vector rigidly, so the datum is
-    unchanged and the inversion cannot tell the difference. The DRAWING can.
-    The stored slip vector means "motion of the block on the upward side of the
-    plane", and when a back-tilt turns a plane through the vertical, the pole
-    crosses the horizontal and that upward side becomes the other block. The
-    same physical movement is then written the other way round, and a symbol
-    drawn from the un-flipped vector points backwards: a left-lateral couple is
-    drawn as right-lateral and the reverse.
+    A rotation carries the normal and the slip vector rigidly, so (n, s) and
+    (-n, -s) are the same datum and the inversion cannot tell them apart. The
+    drawing can, because plot_site takes the symbol's direction from the raw
+    slip vector, and 71 per cent of archive slip vectors point into the upper
+    hemisphere, so this is not an edge case.
 
-    So flip the pair wherever the rotated normal has ended up pointing down.
-    as_records() already does this when writing a site file out; this is the
-    same step for everything that draws.
+    ⚠️ Do NOT apply this before drawing rotated data. It was, briefly, on the
+    reasoning that turning a plane through the vertical swaps hanging wall for
+    footwall and so must reverse the drawn sense. The archive says otherwise
+    and the archive is the authority: across the twelve back-tilt pairs the
+    original program produced, the slip vectors in the back-tilted file agree
+    in sign with the parent's rotated slip vectors in 74 of 76 data. The
+    original kept the rotated vector as it came, so the plots it drew are the
+    un-canonicalised ones, and canonicalising first reversed five of the six
+    striae at L12.
+
+    What it is still for is the file format, where dip azimuth, dip and rake
+    have to be expressed against an upward normal. as_records() does this step
+    itself for exactly that reason.
     """
     n = np.atleast_2d(np.asarray(n, float))
     s = np.atleast_2d(np.asarray(s, float))

@@ -194,7 +194,51 @@ for dipaz, dip in ((224, 27), (44, 27), (348, 44), (10, 80), (330, 15)):
            'ref %03d/%02d at %3d%% -> dip %05.2f (want %05.2f)'
            % (dipaz, dip, pct, rdip, want))
 
-print('\n7. turning a plane through the vertical rewrites its sense')
+print('\n7a. the original did NOT flip slip vectors when it back-tilted')
+# Settles a convention that cannot be settled by reasoning: (n, s) and
+# (-n, -s) are the same datum, so which one a back-tilted file holds is a
+# choice, and plot_site's symbol direction is not invariant to it. The archive
+# made the choice. Each back-tilted run is matched to its parent by Kabsch on
+# the normals, then the parent's rotated slip vectors are compared in sign
+# against what the back-tilted file actually holds.
+if os.path.exists(ROOT):
+    files = tensorfile.discover(ROOT)
+    # every back-tilted run, not only those whose folder spells out the angle
+    tg = [p for p in files if 'backtilt' in p.lower()]
+    pl = [p for p in files if 'backtilt' not in p.lower()]
+    agree = total = pairs = 0
+    for t in tg:
+        try:
+            T = tensorfile.read_site(t)
+        except Exception:
+            continue
+        if len(T) < 5:
+            continue
+        best = None
+        for q in pl:
+            try:
+                S = tensorfile.read_site(q)
+            except Exception:
+                continue
+            if len(S) != len(T):
+                continue
+            R, err = kabsch(S.n, T.n)
+            if best is None or err < best[0]:
+                best = (err, R, S)
+        if best is None or best[0] > 2.0:
+            continue
+        _e, R, S = best
+        pairs += 1
+        d = np.einsum('ki,ki->k', S.s @ R.T, T.s)
+        agree += int((d > 0).sum())
+        total += len(T)
+    ok(pairs >= 10 and agree >= 0.9 * total,
+       'back-tilted files keep the rotated slip vector as it came '
+       '(%d of %d data over %d pairs)' % (agree, total, pairs))
+else:
+    print('   archive missing, skipped')
+
+print('\n7b. canonicalise is available, but for writing files not for drawing')
 # The stored slip vector means "motion of the block on the upward side". Turn
 # the plane through vertical and that side becomes the other block, so the same
 # movement is written the other way round. Drawn un-flipped it reads backwards.
@@ -224,6 +268,14 @@ if os.path.exists(ROOT):
        % (int(flip.sum()), len(site)))
     ok(np.allclose(cn[flip], -rn[flip]) and np.allclose(cs[flip], -rs[flip]),
        'canonicalise flips exactly those pairs, normal and slip together')
+    # and the reason it must not be used before drawing
+    from pytector import plot as _pp
+    d0 = np.degrees(np.arctan2(rs[:, 0], rs[:, 1]))
+    d1 = np.degrees(np.arctan2(cs[:, 0], cs[:, 1]))
+    turned = int((np.abs(((d0 - d1 + 180) % 360) - 180) > 90).sum())
+    ok(turned == int(flip.sum()),
+       'it reverses the drawn striae direction for every pair it flips (%d), '
+       'which is why the drawing path does not call it' % turned)
     ok(np.allclose(cn[~flip], rn[~flip]) and np.allclose(cs[~flip], rs[~flip]),
        'and leaves the rest alone')
     # the pair is flipped together, so the datum is unchanged and the answer

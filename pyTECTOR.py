@@ -1297,7 +1297,8 @@ class Main(QtWidgets.QMainWindow):
     # ------------------------------------------------------------- export --
     def save_png(self):
         fn, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, 'Save figure', '%s.png' % self.site_name, 'PNG (*.png)')
+            self, 'Save figure',
+            rotate.safe_name(self.site_name) + '.png', 'PNG (*.png)')
         if not fn:
             return
         self._draw(annotate=True)
@@ -1364,7 +1365,8 @@ class Main(QtWidgets.QMainWindow):
                 self, 'pyTECTOR', 'Nothing to save yet.')
             return
         fn, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, 'Save session', '%s%s' % (self.site_name, session.EXT),
+            self, 'Save session',
+            rotate.safe_name(self.site_name) + session.EXT,
             'pyTECTOR session (*%s);;All files (*)' % session.EXT)
         if not fn:
             return
@@ -1537,7 +1539,8 @@ class Main(QtWidgets.QMainWindow):
         emitted only the primitive and the fault planes.
         """
         fn, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, 'Save HPGL', '%s.hpgl' % self.site_name, 'HPGL (*.hpgl)')
+            self, 'Save HPGL',
+            rotate.safe_name(self.site_name) + '.hpgl', 'HPGL (*.hpgl)')
         if not fn:
             return
         n, s = self.n_s

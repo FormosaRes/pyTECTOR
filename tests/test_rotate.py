@@ -179,6 +179,21 @@ if os.path.exists(ROOT):
        'rotation really does reverse the side for a solid fraction of data '
        '(%d of %d, %.1f%%)' % (changed, seen, pct))
 
+print('\n6b. the reference surface really is taken to horizontal')
+# What the window's "restore the reference surface to horizontal" mode does,
+# including the partial-restoration percentage. At 100 per cent the surface has
+# to read dip 00; at 50 per cent, half its dip.
+from pytector import plot as _plot
+for dipaz, dip in ((224, 27), (44, 27), (348, 44), (10, 80), (330, 15)):
+    t, p, a = rotate.restores_to_horizontal(dipaz, dip)
+    for pct, want in ((100, 0.0), (50, dip / 2.0)):
+        v = core.normal_from_dipaz(dipaz, dip)
+        v = rotate.rotate_vectors(np.atleast_2d(v), t, p, a * pct / 100.0)[0]
+        _az, rdip = _plot.reference_from_vectors(v)
+        ok(abs(rdip - want) < 0.5,
+           'ref %03d/%02d at %3d%% -> dip %05.2f (want %05.2f)'
+           % (dipaz, dip, pct, rdip, want))
+
 print('\n7. turning a plane through the vertical rewrites its sense')
 # The stored slip vector means "motion of the block on the upward side". Turn
 # the plane through vertical and that side becomes the other block, so the same

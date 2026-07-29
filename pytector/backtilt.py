@@ -561,6 +561,22 @@ class BackTiltWindow(QtWidgets.QDialog):
             self._flag_cache = cache
         return cache.get(tag) or None
 
+    def _disclosure(self, which, rows):
+        """The with-and-without comparison for one of the two states."""
+        key = self.keys()
+        if not rows or not key or len(self.records) < 6:
+            return None
+        n, s = self.n_s
+        if which == 'rot' and self.rot:
+            n, s = rotate.rotate_site(n, s, *self.rot)
+        solver = ((lambda a, b: invdir.run(a, b, n_pass=self.n_pass)['T'])
+                  if key[0] == 'A'
+                  else (lambda a, b: modern.run(a, b, n_starts=200)['T']))
+        try:
+            return diagnose.disclosure(rows, n, s, solver)
+        except Exception:
+            return None
+
     def _refresh_flags(self):
         self._flag_cache = {}
         self._draw()
@@ -673,6 +689,11 @@ class BackTiltWindow(QtWidgets.QDialog):
             if len(hot) > 8:
                 L.append('   ... and %d more' % (len(hot) - 8))
             L.append('')
+            d = self._disclosure(which, rows)
+            if d:
+                L.append('IF THOSE WERE SET ASIDE, %s' % lab)
+                L.append(diagnose.disclosure_text(d, rows))
+                L.append('')
 
         L.append('The ring is the measured answer carried through the '
                  'rotation; the star is the answer from re-inverting the')
@@ -759,12 +780,27 @@ class BackTiltWindow(QtWidgets.QDialog):
                            header='BACK-TILTED' + tag)
             if raw and self.rot and self.cb_carry.isChecked():
                 plot.plot_carried_axes(ax, carried(raw, *self.rot), rot)
+            # in axis mode the rotation is three numbers in a box and nothing
+            # on the diagram; draw the axis so it can be checked by eye
+            if self.rot and self.cmb_src.currentIndex() == 1:
+                plot.plot_rotation_axis(ax, *self.rot)
             if annotate and rot:
                 plot.annotate_result(ax, rot, n_data=len(self.records))
 
+        if not annotate and self.rot and self.cb_carry.isChecked():
+            # One line, in the same ink as the diagram. The coloured legend
+            # that stood here was removed with the colours, but "what is the
+            # dashed line" still needs an answer on the page.
+            bits = ['○ measured axis carried through the rotation',
+                    'dashed = its path to the ★ re-inverted answer']
+            if self.cmb_src.currentIndex() == 1:
+                bits.append('⊙ rotation axis, arrow = which way it turns')
+            self.fig.text(0.02, 0.006, '     '.join(bits), fontsize=7.5,
+                          va='bottom',
+                          color='#1E1E1C' if plot.PEN == 'k' else plot.PEN)
         self.fig.subplots_adjust(left=0.02, right=0.98,
                                  top=0.99 if annotate else 0.90,
-                                 bottom=0.06 if annotate else 0.03,
+                                 bottom=0.06 if annotate else 0.045,
                                  wspace=0.02, hspace=0.28)
         # after the layout, because it measures the panels
         plot.fit_captions(self.fig)
@@ -776,40 +812,72 @@ class BackTiltWindow(QtWidgets.QDialog):
         stereograms."""
         plot.fit_captions(self.fig)
 
-    def save_hpgl(self):
-        """The restored stereogram as HPGL, the format the original plotted in.
+    #: where each panel's centre goes in plotter units. A stereogram with its
+    #: frame is about 2.5 x 2.8 plot units, and the writer's scale is 2002
+    #: units per plot unit, so 5600 across and 6200 down clears it.
+    HPGL_PITCH = (5600, 6200)
 
-        Replays plot_site through the pen recorder rather than emitting a
-        second, shorter drawing routine, so the file carries what the figure
-        carries: striae, ticks, centre cross, N and M, frame, arrows and
-        reference surfaces. The as-measured panel is the main window's Save
-        HPGL; this is the back-tilted one, named the way the archive names it.
+    def save_hpgl(self):
+        """Everything on screen as HPGL, in one file, laid out as on screen.
+
+        It used to write the back-tilted panel alone, which threw away three
+        quarters of what the window had just computed: the comparison IS the
+        output here, so the file has to carry the pair, and both methods when
+        both are shown.
+
+        Replays plot_site through the pen recorder rather than keeping a second,
+        shorter drawing routine, so each panel carries what the figure carries:
+        striae, ticks, centre cross, N and M, frame, arrows, reference surfaces.
+        The writer reads its origin at every call, so moving the origin between
+        panels tiles them into one plot.
         """
         n, s = self.n_s
-        if not len(n) or not self.rot:
-            QtWidgets.QMessageBox.information(
-                self, 'pyTECTOR', 'Set a rotation first.')
+        if not len(n):
             return
-        default = '%s %s.hpgl' % (self.site_name, rotate.describe(*self.rot))
+        keys = [k for k in self.keys() if ('raw_' + k) in self.results]
+        if not keys:
+            QtWidgets.QMessageBox.information(
+                self, 'pyTECTOR', 'Invert first: there is nothing to write.')
+            return
+        tag = rotate.describe(*self.rot) if self.rot else 'as measured'
         fn, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, 'Save back-tilted HPGL', default, 'HPGL (*.hpgl)')
+            self, 'Save HPGL', '%s %s.hpgl' % (self.site_name, tag),
+            'HPGL (*.hpgl)')
         if not fn:
             return
-        rn, rs = rotate.rotate_site(n, s, *self.rot)
-        rn, rs = rotate.canonicalise(rn, rs)
-        key = self.keys()
-        res = self.results.get('rot_' + key[0]) if key else None
-        rec = penrec.Recorder()
-        plot.plot_site(rec, rn, rs, res, certainty=self.certainty,
-                       sides=plot.strike_slip_sign_vectors(rn, rs),
-                       site_code=self.site_name,
-                       reference=self.reference_now(True),
-                       declination=self.decl,
-                       header='BACK-TILTED  %03.0f/%02.0f %+.0f' % self.rot)
-        rec.emit(hpgl.Writer()).save(fn)
+
+        rn, rs = ((n, s) if not self.rot
+                  else rotate.canonicalise(*rotate.rotate_site(n, s,
+                                                               *self.rot)))
+        sides, sides_rot = (plot.strike_slip_sign_vectors(n, s),
+                            plot.strike_slip_sign_vectors(rn, rs))
+        rtag = ('' if not self.rot
+                else '  %03.0f/%02.0f %+.0f' % self.rot)
+
+        w = hpgl.Writer()
+        x0, y0 = w.origin
+        dx, dy = self.HPGL_PITCH
+        panels = 0
+        for row, k in enumerate(keys):
+            name = dict((m[0], m[1]) for m in METHODS).get(k, '')
+            for col, (nn, ss, sd, res, head) in enumerate((
+                    (n, s, sides, self.results.get('raw_' + k),
+                     'AS MEASURED  %s' % name),
+                    (rn, rs, sides_rot, self.results.get('rot_' + k),
+                     'BACK-TILTED  %s%s' % (name, rtag)))):
+                rec = penrec.Recorder()
+                plot.plot_site(rec, nn, ss, res, certainty=self.certainty,
+                               sides=sd, site_code=self.site_name,
+                               reference=self.reference_now(col == 1),
+                               declination=self.decl, header=head)
+                # top row first, so the sheet reads the way the window does
+                w.origin = (x0 + col * dx, y0 + (len(keys) - 1 - row) * dy)
+                rec.emit(w)
+                panels += 1
+        w.origin = (x0, y0)
+        w.save(fn)
         QtWidgets.QMessageBox.information(
-            self, 'pyTECTOR',
-            'saved %s\n%d vectors' % (fn, len(rec.polylines)))
+            self, 'pyTECTOR', 'saved %s\n%d panels' % (fn, panels))
 
     def save_png(self):
         fn, _ = QtWidgets.QFileDialog.getSaveFileName(

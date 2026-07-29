@@ -649,6 +649,58 @@ def fit_captions(fig, base=8.0, floor=4.0):
             t.set_fontsize(size)
 
 
+def plot_rotation_axis(ax, trend, plunge, angle, lw=None, zorder=11):
+    """The rotation axis itself, with which way it turns.
+
+    In axis mode the rotation is three numbers in a box at the top of the
+    window and nothing on the diagram, so there is no way to see whether the
+    axis you typed is the one you meant. This puts it on the stereogram: an
+    open circle with a dot at the axis, and a curved arrow round it for the
+    sense.
+
+    Sense on the page. The convention is the right-hand rule, which is
+    anticlockwise seen from the head of the axis looking back down it. The
+    stereogram is looked at from above, i.e. along the axis into the ground, and
+    that reverses the apparent turn, so a POSITIVE angle draws CLOCKWISE about
+    the plotted end. Checked numerically over a spread of attitudes rather than
+    reasoned about, because it is exactly the kind of sign that gets flipped.
+
+    A horizontal axis has no down-plunge end, so both ends are drawn.
+    """
+    lw = STROKE if lw is None else lw
+    k = vec_from_trend_plunge(trend, plunge)
+    ends = [k] if abs(plunge) > 2.0 else [k, -k]
+    for e in ends:
+        X, Y = schmidt(np.atleast_2d(e))
+        x, y = float(X[0]), float(Y[0])
+        ax.plot([x], [y], marker='o', ms=11.0, markerfacecolor='none',
+                markeredgecolor=PEN, mew=lw * 1.4, linestyle='none',
+                zorder=zorder, antialiased=AA)
+        ax.add_patch(plt_circle(x, y, 0.016, zorder=zorder))
+        if not angle:
+            continue
+        # a three-quarter arc round the mark, opening where the head goes
+        r = 0.085
+        cw = angle > 0
+        t0, t1 = (200.0, -40.0) if cw else (-20.0, 220.0)
+        th = np.radians(np.linspace(t0, t1, 40))
+        ax.plot(x + r * np.cos(th), y + r * np.sin(th), color=PEN,
+                lw=lw * 1.1, zorder=zorder, antialiased=AA,
+                solid_capstyle='round')
+        ax.annotate('', xy=(x + r * np.cos(th[-1]), y + r * np.sin(th[-1])),
+                    xytext=(x + r * np.cos(th[-4]), y + r * np.sin(th[-4])),
+                    arrowprops=dict(arrowstyle='-|>', color=PEN, lw=lw * 1.1,
+                                    shrinkA=0, shrinkB=0),
+                    zorder=zorder, annotation_clip=False)
+    if ends:
+        X, Y = schmidt(np.atleast_2d(ends[0]))
+        ax.annotate('%+.0f%s' % (angle, DEGREE),
+                    xy=(float(X[0]), float(Y[0])), xytext=(0, -15),
+                    textcoords='offset points', ha='center', va='top',
+                    fontsize=7.5, family='monospace', color=PEN,
+                    zorder=zorder, annotation_clip=False)
+
+
 def reference_from_vectors(nvec):
     """Dip azimuth and dip of a plane given its (possibly rotated) normal."""
     v = np.asarray(nvec, float)

@@ -71,10 +71,11 @@ def influence(n, s, solver, base=None):
         keep = np.ones(k, bool)
         keep[i] = False
         try:
-            d = core.describe(solver(n[keep], s[keep]))
+            T = solver(n[keep], s[keep])
+            d = core.describe(T)
         except Exception:
             out.append(dict(i=i + 1, s1=None, s2=None, s3=None, dphi=None,
-                            worst=None))
+                            worst=None, ang_out=None, rup_out=None))
             continue
         moves = []
         for key in ('sigma1', 'sigma2', 'sigma3'):
@@ -82,9 +83,16 @@ def influence(n, s, solver, base=None):
             v = core.vec_from_trend_plunge(*d[key])
             moves.append(float(np.degrees(np.arccos(
                 min(abs(float(u @ v)), 1.0)))))
+        # The DELETED residual: this datum measured against the tensor fitted
+        # WITHOUT it. The ordinary ANG is contaminated, because an influential
+        # datum drags the solution towards itself and so flatters its own
+        # misfit. The deleted one is what the other faults say about it, and it
+        # is the number that belongs in a decision to set it aside.
+        e = core.estimators(T, n[i:i + 1], s[i:i + 1])
         out.append(dict(i=i + 1, s1=moves[0], s2=moves[1], s3=moves[2],
                         dphi=float(d['phi'] - base['phi']),
-                        worst=max(moves[0], moves[2])))
+                        worst=max(moves[0], moves[2]),
+                        ang_out=float(e['ANG'][0]), rup_out=float(e['RUP'][0])))
     return out
 
 
@@ -114,6 +122,7 @@ def combine(res, n, s, solver):
         severe = d['ang_flag'] == '!!' or d['rup_flag'] == '!!'
         row.update(s1_move=g.get('s1'), s3_move=g.get('s3'),
                    worst_move=g.get('worst'), dphi=g.get('dphi'),
+                   ANG_out=g.get('ang_out'), RUP_out=g.get('rup_out'),
                    badly_fitted=bad, load_bearing=heavy, severe=severe,
                    flag=('!!' if bad and heavy else ('!' if bad or heavy
                                                      else '')),
@@ -126,6 +135,100 @@ def combine(res, n, s, solver):
                    plot_mark=('!!' if heavy else ('!' if severe else '')))
         out.append(row)
     return out
+
+
+def disclosure(rows, n, s, solver, drop=None):
+    """What to put in the paper when one striation is unlike the others.
+
+    Setting a datum aside is a legitimate thing to do and a silent thing to
+    hide. The difference is entirely in what gets reported, so this produces
+    the block that makes it honest: the solution with everything in, the
+    solution without the data being set aside, and the movement between them.
+    If excluding one fault swings sigma1 by twenty degrees, that belongs on the
+    page next to the number, not behind it.
+
+    This is also Angelier's own habit. INFO1 never prints a single mean: it
+    prints the statistic over all data AND over the subset inside the
+    threshold, with the counts in each band, so a reader can see how much of
+    the quality came from trimming.
+
+    drop  1-based indices to exclude; defaults to everything flagged for the
+          diagram, i.e. load-bearing or far outside the bands.
+    """
+    n = np.atleast_2d(np.asarray(n, float))
+    s = np.atleast_2d(np.asarray(s, float))
+    if drop is None:
+        drop = [r['i'] for r in rows if r['plot_mark']]
+    drop = sorted(set(int(i) for i in drop))
+    keep = np.ones(len(n), bool)
+    for i in drop:
+        if 1 <= i <= len(n):
+            keep[i - 1] = False
+
+    full = core.describe(solver(n, s))
+    out = dict(n_total=len(n), dropped=drop, n_kept=int(keep.sum()),
+               full=full, trimmed=None, moves=None)
+    if not drop or keep.sum() < 4:
+        return out
+    trim = core.describe(solver(n[keep], s[keep]))
+    moves = []
+    for key in ('sigma1', 'sigma2', 'sigma3'):
+        u = core.vec_from_trend_plunge(*full[key])
+        v = core.vec_from_trend_plunge(*trim[key])
+        moves.append(float(np.degrees(np.arccos(min(abs(float(u @ v)), 1.0)))))
+    out.update(trimmed=trim, moves=moves)
+    return out
+
+
+def disclosure_text(d, rows=None):
+    """The block above, written out."""
+    L = []
+    f = d['full']
+    L.append('%-26s %-9s %-9s %-9s %s'
+             % ('', 'sigma1', 'sigma2', 'sigma3', 'Phi'))
+    L.append('%-26s %-9s %-9s %-9s %.3f'
+             % ('all %d data' % d['n_total'],
+                '%03.0f/%02.0f' % f['sigma1'], '%03.0f/%02.0f' % f['sigma2'],
+                '%03.0f/%02.0f' % f['sigma3'], f['phi']))
+    if d['trimmed'] is None:
+        L.append('nothing set aside.')
+        return '\n'.join(L)
+    t = d['trimmed']
+    L.append('%-26s %-9s %-9s %-9s %.3f'
+             % ('without %s' % ','.join(str(i) for i in d['dropped']),
+                '%03.0f/%02.0f' % t['sigma1'], '%03.0f/%02.0f' % t['sigma2'],
+                '%03.0f/%02.0f' % t['sigma3'], t['phi']))
+    m = d['moves']
+    L.append('%-26s %-9s %-9s %-9s %+.3f'
+             % ('the axes move', '%.1f deg' % m[0], '%.1f deg' % m[1],
+                '%.1f deg' % m[2], t['phi'] - f['phi']))
+    L.append('')
+    if rows:
+        by_i = {r['i']: r for r in rows}
+        L.append('%-4s %8s %8s %9s %9s  %s'
+                 % ('n', 'ANG', 'ANG*', 'RUP', 'RUP*', 'what it is'))
+        for i in d['dropped']:
+            r = by_i.get(i)
+            if not r:
+                continue
+            why = []
+            if r.get('load_bearing'):
+                why.append('moves an axis %.1f deg' % (r['worst_move'] or 0))
+            if r.get('severe'):
+                why.append('outside the far band')
+            L.append('%-4d %8.1f %8s %9.1f %9s  %s'
+                     % (i, r['ANG'],
+                        '-' if r.get('ANG_out') is None
+                        else '%.1f' % r['ANG_out'],
+                        r['RUP'],
+                        '-' if r.get('RUP_out') is None
+                        else '%.1f' % r['RUP_out'],
+                        '; '.join(why)))
+        L.append('ANG* and RUP* are measured against the solution fitted '
+                 'WITHOUT that datum, so they are not')
+        L.append('flattered by its own pull on the answer. Report those, not '
+                 'the plain ANG and RUP.')
+    return '\n'.join(L)
 
 
 def text_table(rows, limit=None):

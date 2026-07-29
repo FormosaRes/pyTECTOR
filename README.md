@@ -617,8 +617,10 @@ until one is added.
 
 ## Still open
 
-- the `[0:2]` type-code table is decoded but not cross-checked against a manual
-- writing TENSOR-format data files back out
+- writing TENSOR-format data files back out (the site-header fields are now
+  known, see [docs/mesure_oracle.md](docs/mesure_oracle.md))
+- a public end-to-end fixture: the synthetic `test` site typed into the real
+  MESURE still needs its `Tensor.exe` INFO1/MOHR1 brought over
 - PSID, R4DT and NDA, Angelier's other methods, deliberately not started
 - a licence
 
@@ -1043,8 +1045,10 @@ research/           每個常數是怎麼量出來的，該夾有自己的 READM
 
 ## 還沒做
 
-- `[0:2]` 代碼表已解出但還沒對過手冊
-- 寫回 TENSOR 格式的資料檔
+- 寫回 TENSOR 格式的資料檔（站頭欄位已經從原程式實跑解出來了，
+  見 [docs/mesure_oracle.md](docs/mesure_oracle.md)）
+- 公開的端到端 fixture：打進真 MESURE 的合成站 `test` 還缺 `Tensor.exe`
+  跑出來的 INFO1／MOHR1
 - PSID、R4DT、NDA 這幾個 Angelier 的其他方法，刻意還沒開始
 - 授權條款
 

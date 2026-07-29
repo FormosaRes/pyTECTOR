@@ -1,6 +1,6 @@
 <div align="center">
 
-# pyTECTOR
+![pyTECTOR](docs/img/banner.png)
 
 **Angelier 古應力反演的 Python 重建版 — TENSOR 5.45 (jan91)**
 

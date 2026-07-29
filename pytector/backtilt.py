@@ -301,11 +301,11 @@ class BackTiltWindow(QtWidgets.QDialog):
                      'four-field entry format, ready to paste into a new site.')
         b.clicked.connect(self._copy_data)
         brow.addWidget(b)
-        self.btn_adopt = QtWidgets.QPushButton('Send to main window')
+        self.btn_adopt = QtWidgets.QPushButton('Show in main window')
         self.btn_adopt.setToolTip(
-            'Replace the main window’s data with these back-tilted '
-            'records, named the way the archive names them. The solutions are '
-            'dropped, because they belong to the data that produced them.')
+            'Add the back-tilted stereograms to the main figure, as a second '
+            'row under the measured ones. Nothing is replaced: the records and '
+            'the measured stereograms stay exactly as they are.')
         self.btn_adopt.clicked.connect(self._adopt)
         brow.addWidget(self.btn_adopt)
         lv.addLayout(brow)
@@ -897,27 +897,27 @@ class BackTiltWindow(QtWidgets.QDialog):
         self._changed()
 
     def _adopt(self):
-        """Hand the back-tilted records to the main window.
+        """Show the back-tilted result on the main figure, without disturbing
+        anything there.
 
-        This is the step the archive records in its folder names: the data were
-        rotated elsewhere, written out as a new site, and re-run. Doing it here
-        means the rotation settled on in this window is the one carried over,
-        rather than being retyped.
+        An earlier version replaced the main window's records with the rotated
+        ones. That was wrong: a tilt test is a comparison, and overwriting the
+        measured data destroys the half being compared against. The rotation
+        and the solutions go across; the data do not move.
         """
-        recs = self.rotated_records()
-        if not recs or self.main is None:
+        if not self.rot or self.main is None:
             QtWidgets.QMessageBox.information(
                 self, 'pyTECTOR', 'Set a rotation first.')
             return
-        # carry the letters across; as_records only knows the geometry
-        out = []
-        for a, b in zip(self.records, recs):
-            r = dict(a)
-            r.update(dipaz=b['dipaz'], dip=b['dip'], rake=b['rake'])
-            out.append(r)
-        name = '%s %s' % (self.site_name, rotate.describe(*self.rot))
-        self.main.adopt_records(out, name)
-        self.lbl_data.setText('sent to the main window as %s' % name)
+        got = dict((k, self.results['rot_' + k]) for k, _n, _d in METHODS
+                   if ('rot_' + k) in self.results)
+        if not got:
+            QtWidgets.QMessageBox.information(
+                self, 'pyTECTOR', 'Invert first: there is no result to show.')
+            return
+        self.main.show_backtilted(self.rot, got)
+        self.lbl_data.setText('shown on the main figure, %s'
+                              % rotate.describe(*self.rot))
 
     def _copy_data(self):
         recs = self.rotated_records()

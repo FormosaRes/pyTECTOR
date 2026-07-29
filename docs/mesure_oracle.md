@@ -1,3 +1,8 @@
+# The original programs run as oracles
+
+Two sessions on the Windows XP machine (a VMware guest), both photographed in
+full: MESURE 5.51 creating a data file, and TENSOR 5.45 inverting one.
+
 # MESURE 5.51 run as an oracle
 
 On 2026-07-29 the original data-entry program was run on the Windows XP
@@ -116,11 +121,105 @@ CD 090 85N 150     pitch 87.1W  line 330.0/84.2    MESURE  87W 329/84
 MESURE prints whole degrees; its 329 against an exact 330.0 is its own
 rounding. Everything else agrees to a tenth of a degree.
 
+# TENSOR 5.45 run as an oracle (2026-07-29)
+
+`Tensor.exe`, same machine, on a synthetic five-fault file named `L12-2`,
+site 01. The whole dialogue was photographed.
+
+## The dialogue
+
+```
+FRANCAIS (1), ENGLISH (2) ? 2
+WILL YOU NEED MOST ORDINARY RUN MODE ?
+[IF NOT, ACCESS TO AUTOMATISM, TO REPEATED
+ PROCESSES AND TO SPECIAL CHOICES]   (Y/N) : Y     <- N is where repeated
+                                                      passes (NO 2+) live
+WILL YOU CREATE A "MOHR" FILE ... ? (Y/N) : Y
+FAULTS TO BE RETAINED FOR THE MOHR'S DIAGRAM ?
+0 = ALL FAULTS, EVEN UNCONSISTENT (!-!!) [RUP 0-200 % or ANG 0-180 deg] ;
+1 = FAULTS WELL OR MODERATELY CONSISTENT (!) [RUP 0-75 % or ANG 0-45 deg] ;
+2 = FAULTS WELL CONSISTENT SOLELY [RUP 0-50 % or ANG 0-22.5 deg]  : 0
+
+>>> FILE READY TO BE CREATED : INFO2               <- INFO1 existed, so the
+>>> FILE READY TO BE CREATED : MOHR2                  number increments
+
+DO YOU NEED INFORMATION ABOUT THE METHODS ? Y      <- see below
+
+NAME OF DATA FILE ? (/=END) : L12-2
+ENTER THE NAME OF NEEDED SITE ! (?=NEXT SITE,
+ !=SAME SITE AS BEFORE, +=ENTIRE FILE, /=END) : 01
+SITE SUFFIX ? [3 CHAR.; /=DOES NOT MATTER] : /
+WILL YOU ADOPT THE FOLLOWING DEFAULT OPTION :
+ALL CERTAINTIES, ALL WEIGHTS, ANY AGE ?
+[IF NOT, SUCCESSIVE CHOICES] [A: AGE SOLELY] (Y/N) : Y
+WHAT METHOD WILL YOU USE FOR TENSOR COMPUTATION ?
+(INVD, R4DT, R4DS, R2DT, R2DS)      [help=?] : INVD
+DATA WEIGHTING MODE ?
+1=NO WEIGHTING ; 2=WEIGHT ; 3=WEIGHT+ERRORS;
+4=WEIGHT+ERRORS+OFFSET; 5=ERRORS; 6=ERRORS+OFFSET;
+7=OFFSET; 8=WEIGHT+OFFSET : 1
+...
+DO YOU PLAN RECORDING THIS RESULT ? (Y/N) : Y      <- THIS writes the 03 line
+                                                      into the data file
+```
+
+## The result, readable off the photographs
+
+```
+SOLUTION PSIDIR          AXES OK !
+LAMBDA= 0.87            TAUMAX= 0.85
+S1= 0.77    S2= 0.16    S3=-0.94
+AXIS SIGMA 1   D= 255.   P= 21.
+AXIS SIGMA 2   D= 115.   P= 64.
+AXIS SIGMA 3   D= 351.   P= 15.
+RATIO PHI= 0.645
+
+per fault (x100): SIGMA SIGMN TAU TAUST    RMU  RUP  OBL  ANG
+  1.  76  9 75 75   812  16   7  5
+  2.  77 24 73 73   303  16  18  2
+  3.  73  3 73 73  2220  16   3  3
+  4.  76 15 75 74   484  14  12  2
+  5.  74 20 72 71   358  20  16  6
+mean 75 14 73 73    835  16   11   4      s.dev 1 7 1 1  714  2  6  1
+
+03INVD09254.820.7114.663.9350.715.30.645 3.7 16.10919  5.  501       2
+```
+
+So: σ₁ 254.8/20.7, σ₂ 114.6/63.9, σ₃ 350.7/15.3, Φ 0.645, mean ANG 3.7,
+mean RUP 16.1, n = 5.
+
+## What the session settles
+
+- **Where multi-pass runs come from.** The ordinary run mode skips them;
+  answering N at the first question opens "automatism, repeated processes and
+  special choices", which is where the archive's NO 2-5 runs were made.
+- **The `<75` / `<45` columns' thresholds are the program's own fault-quality
+  bands** (0-50/0-75/0-200 RUP, 0-22.5/0-45/0-180 ANG), the same bands used
+  to pick which faults a MOHR file keeps.
+- **The 03 result line in every archive data file is written by the
+  "DO YOU PLAN RECORDING THIS RESULT" step**, which is why data files carry
+  their own results.
+- **Output numbering**: INFO2/MOHR2 are created when INFO1/MOHR1 already
+  exist, which explains the INFO2/MOHR2 files dotted through the archive.
+- **Weighting modes 1-8** combine weight, the per-site instrument/observer
+  errors, and offset. The archive runs used mode 1 (all weights 1.0).
+- **TENSOR's own method credits**: INVDIR is "modified from a first method,
+  now abandoned, by J. Angelier and J. Goguel (1979)" (C.R. Acad. Sci. Paris
+  288(D), 307-310) and "described in detail" in the GJI paper (cited as 1988,
+  its in-press year inside the jan91 binary; it appeared in 1990). R4DT/R4DS
+  are the 4-D iterative searches minimising S2 (tan) or S3 (sin), the
+  angle-only criteria; R2DT/R2DS constrain one axis to vertical. Companion
+  programs named: DIEDRE (P-T dihedra), CONJUG (conjugate systems), and the
+  post-processors ANATEN, TRIAGE, DIMOHR.
+
 ## Why this matters for the repository
 
 The field archive cannot be published, so until now every regression fixture
-needed `PYTECTOR_ARCHIVE`. A synthetic site typed into the real MESURE, run
-through the real TENSOR, photographed or copied out, is an oracle with no
-privacy constraint at all. The three records above are the first piece. If
-the same `test` site is run through `Tensor.exe` and its INFO1 and MOHR1 are
-brought over, the whole pipeline gains a public fixture.
+needed `PYTECTOR_ARCHIVE`. A synthetic site typed into the real MESURE and
+inverted by the real TENSOR is an oracle with no privacy constraint at all.
+
+The one missing piece is the `L12-2` data file itself (the five records).
+Once it, `INFO2` and `MOHR2` are copied off the XP machine (the VMware shared
+folder will do), they become a public end-to-end fixture: read the file,
+invert, and match the original program's own INFO and MOHR output to the
+printed decimal.

@@ -24,6 +24,7 @@ themselves are still usable.
 """
 import io
 import json
+import os
 
 import numpy as np
 
@@ -113,6 +114,36 @@ def loads(text, n=None, s=None):
         out[key] = r
     state['results'] = out
     return state
+
+
+#: Sessions have a home rather than landing wherever the last dialog was, so
+#: that a fresh clone has somewhere obvious to put them and they stay together.
+#: The folder is in the repository (with a .gitkeep) so it exists on install;
+#: its contents are field data and are git-ignored.
+DIRNAME = 'Session'
+
+
+def default_dir():
+    """The Session folder beside the program, created if it is not there yet.
+
+    Falls back to the home directory if that location cannot be written, which
+    is what happens when the package is installed read-only into site-packages
+    rather than run from a clone.
+    """
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    d = os.path.join(root, DIRNAME)
+    try:
+        if not os.path.isdir(d):
+            os.makedirs(d)
+        return d
+    except OSError:
+        return os.path.expanduser('~')
+
+
+def default_path(site):
+    """Where a session for this site should be offered."""
+    from .rotate import safe_name
+    return os.path.join(default_dir(), safe_name(site) + EXT)
 
 
 def save(path, state):

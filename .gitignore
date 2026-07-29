@@ -19,6 +19,10 @@ dist/
 *.rar
 
 # field data: sessions and saved sites are the user's own measurements and do
-# not belong in a code repository, private or not
-Session/
+# not belong in a code repository, private or not. The FOLDER is tracked, via
+# its .gitkeep, so a fresh clone has somewhere to put them; the contents are
+# not.
+Session/*
+!Session/.gitkeep
+!Session/README.md
 *.tec

@@ -212,14 +212,21 @@ mean RUP 16.1, n = 5.
   programs named: DIEDRE (P-T dihedra), CONJUG (conjugate systems), and the
   post-processors ANATEN, TRIAGE, DIMOHR.
 
-## Why this matters for the repository
+## The fixture is in the repository
 
-The field archive cannot be published, so until now every regression fixture
-needed `PYTECTOR_ARCHIVE`. A synthetic site typed into the real MESURE and
-inverted by the real TENSOR is an oracle with no privacy constraint at all.
+The complete `L12-2` run is committed at `tests/fixtures/L12-2/`: the data
+file, `INFO1`, `MOHR1`, `PLOT1`, the `HPGL` plot, and `Mesure_key.txt`, which
+is the keystroke log of the MESURE session that created it (five records,
+declination +2, date 090326, page 50). The site is synthetic, so unlike the
+field archive it can be published.
 
-The one missing piece is the `L12-2` data file itself (the five records).
-Once it, `INFO2` and `MOHR2` are copied off the XP machine (the VMware shared
-folder will do), they become a public end-to-end fixture: read the file,
-invert, and match the original program's own INFO and MOHR output to the
-printed decimal.
+`tests/test_fixture.py` runs against it with no environment variable at all:
+the reader, the 03 line, the INFO1 fields, the forward model against every
+MOHR1 row, the full INVDIR pipeline (axes to 0.05 degrees, Phi exact, printed
+LAMBDA 0.73, INVDIR-stage Phi 0.674), S4MIN, and the HPGL geometry. Anyone
+who clones the repository can verify pyTECTOR against the original program's
+own output.
+
+The photographed 2026-07-29 re-run of the same file reproduced the recorded
+03 line digit for digit, so the fixture and the dialogue above describe the
+same computation.

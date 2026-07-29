@@ -1,0 +1,101 @@
+ >>>>>>>>>>> FILE READY TO BE CREATED  : INFO1                                             
+ PROGRAMS BY JACQUES ANGELIER,
+ QUANTITATIVE TECTONICS, UNIVERSITY P. M. CURIE, 75252 PARIS CEDEX 05, FRANCE.
+
+              ****************************************************
+              *** DATA BASE FOR TECTONIC ORIENTATIONS "TECTOR" ***
+              ****************************************************
+
+ >>>>>>>>>>> FILE READY TO BE CREATED  : MOHR1                                             
+               Progr. TENSOR, 1975-1991,  version 5.45, jan91
+               Copyright 1987,1988,1989,1990,1991 J. Angelier
+               ++++++++++++++++++++++++++++++++++++++++++++++
+               ++++  CALCUL DU  TENSEUR DES CONTRAINTES  ++++
+               ++++    DETERMINATION OF STRESS TENSOR    ++++
+               ++++++++++++++++++++++++++++++++++++++++++++++
+
+
+ REFERENCES OF TENSOR DETERMINATION METHODS :
+ INVDIR : DIRECT INVERSION. - modified from a first
+  method, now abandoned, by J. Angelier and J. Goguel
+  (1979) [C.R.Acad.Sci.Paris,288,(D),307-310], based on
+  analytic inversion ; the present method INVDIR
+  minimizes a function thay depends on both the slip-
+  shear angle and the shear. This function resembles the
+  function described as S4 by J. Angelier (1984) [Journal of
+  Geophys.Res.,89,B7,5835-5848]. The new method INVDIR is
+  described in detail in J.Angelier (1988),
+  Geophysical J. International, 103, 363-376.
+ R4DT, R4DS, R2DT, R2DS : ITERATIVE SEARCH. -
+  These methods imply search of stress axes
+  in 2 (R2DT,R2DS) or 4 dimensions (R4DT,R4DS),
+  as well as of ratio PHI. First presentation in :
+  J.Angelier (1975), C.R.Acad.Sci.Paris, 281,(D), 1805-1808
+  [erratum, 283,(D),p.466]. More detailed descriptions in :
+  J.Angelier (1979a) [Tectonophysics,56,T17-T26];
+  J.Angelier (1979b) [Soc.Geol.Nord,Publ.3,418p.,29pl];
+  J.Angelier (1983) [Soc.Geol.France,7,XXV,5,661-672];
+  J.Angelier (1984) [J. of Geophys.Res.,89,B7,5835-5848].
+  In the iterative search, the functions adopted are
+  S2 (R4DTAN) or S3 (R4DSIN) : J.Angelier (1984,p.5841)
+  These functions minimize the stria-shear angle solely, so
+  that permutations of axes may occur for special data sets.
+  For R2DS/R2DT, one axis is constrained to vertical.
+
+ APPLICATIONS ET AUTRES METHODES. -
+  Detailed practical examples of tensor determinations,
+  in addition to papers mentioned above, are given in :
+  J.Angelier, B.Colletta and R.E.Anderson (1985) [Geol. Soc.
+    Amer. Bull. 96, 347-361 and Suppl. Data 85-09];
+  J.Angelier (1989) [J. Struct. Geol.,11,1/2,37-50];
+  Other methods are used in different programs,
+  such as :  DIEDRE (method of P- and T- dihedra),
+             CONJUG (analysis of conjugate systems).
+  Furthermore, special programs allow additional analyses
+  following this program : ANATEN, TRIAGE, DIMOHR.
+
+ >>>>>>>>>>> FILE READY TO BE MODIFIED : L12-2                                             
+ -----> SITE FOUND : 01          
+    5 FAULT SLIP DATA RETAINED !
+
+ ************************************************************************
+ * PROGRAM TENSOR, OPTION INVD      ACC=9 PON=1   REF.  1    J.ANGELIER *
+ * SITE 01              SEL=CPS WEI=0-9 AGE=9****(9)   NBR=  5 TOT=  5. *
+ ************************************************************************
+
+
+                    SOLUTION INVDIR (NO 1)  LAMBDA= 0.73
+                    AXIS SIGMA 1     D= 255.     P=  21.
+                    AXIS SIGMA 2     D= 115.     P=  64.
+                    AXIS SIGMA 3     D= 351.     P=  15.
+                    RATIO PHI= 0.674   [(S2-S3)/(S1-S3)]
+
+                    SOLUTION PSIDIR            AXES OK !
+                    LAMBDA= 0.87            TAUMAX= 0.85
+                    S1= 0.77      S2= 0.16      S3=-0.94
+                    AXIS SIGMA 1     D= 255.     P=  21.
+                    AXIS SIGMA 2     D= 115.     P=  64.
+                    AXIS SIGMA 3     D= 351.     P=  15.
+                    RATIO PHI= 0.645   [(S2-S3)/(S1-S3)]
+
+ NUMERO  POIDS     SIGMA SIGMN TAU TAUST     RMU     RUP     OBL     ANG 
+ NUMBER WEIGHT      <------ x100 ----->      (%)     (%)    (deg)   (deg)
+     1.    1.0       76    9   75   75       812     16       7       5  
+     2.    1.0       77   24   73   73       303     16      18       2  
+     3.    1.0       73    3   73   73      2220     16       3       3  
+     4.    1.0       76   15   75   74       484     14      12       2  
+     5.    1.0       74   20   72   71       358     20      16       6  
+
+ n=  5             SIGMA SIGMN TAU TAUST     RMU   RUP <75  OBL   ANG <45 
+ t=  5.             <------ x100 ----->      (%)   <-(%)-> (deg)  <-deg-> 
+       MOYENNE/MEAN  75   14   73   73       835    16  16   11     4   4
+       ECART-/S.DEV   1    7    1    1       714     2   2    6     1   1
+ ang: (<45) n0,t0=   5   5     (!!) n1,t1=   0   0     (!) n2,t2=   0   0
+ rup: (<75) n0,t0=   5   5     (!!) n1,t1=   0   0     (!) n2,t2=   0   0
+ 03INVD09254.820.7114.663.9350.715.30.645 3.7 16.10919   5.  501        1
+
+          -----> END OF SITE 01          
+
+ >>>>>>>>>>>> CLOSING OF FILE MODIFIED : L12-2                                             
+ >>>>>>>>>>>> CLOSING OF FILE CREATED  : MOHR1                                             
+ >>>>>>>>>>>> CLOSING OF FILE CREATED  : INFO1                                             

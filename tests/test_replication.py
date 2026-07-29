@@ -108,6 +108,62 @@ for name, path in SITES:
         fails.append('%s Mode B not a better minimum' % name)
         print('    FAIL: Mode B should reach a lower or equal S4')
 
+
+# ---- 4. the PSIDIR PERMUTATION / AXES OK ! flag --------------------------
+# TENSOR prints one of two 11-character words on its PSIDIR line. Which one is
+# decided by nothing more than the sector psi lands in: the A16 eigenvalues
+# cos(psi + 0, 2pi/3, 4pi/3) are in descending order only over the last 60
+# degrees of the turn, so anywhere else the labels sigma1/sigma2/sigma3 move
+# on to different frozen axes. Checked against what the archive recorded.
+print('=' * 74)
+print('PSIDIR permutation flag vs the archive')
+
+
+def archive_flag(folder):
+    for nm in ('INFO1', 'INFO2', 'INFO3'):
+        p = os.path.join(folder, nm)
+        if os.path.exists(p):
+            t = open(p, errors='replace').read()
+            if 'SOLUTION PSIDIR' in t:
+                return 'PERMUTATION' if 'PERMUTATION' in t else 'AXES OK !'
+    return None
+
+
+if os.path.exists(ROOT):
+    agree = tested = skipped = 0
+    for p in tensorfile.discover(ROOT):
+        flag = archive_flag(os.path.dirname(p))
+        if flag is None:
+            continue
+        try:
+            site = tensorfile.read_site(p)
+            if len(site) < 4 or not site.result_line:
+                continue
+            arch = tensorfile.parse_result_line(site.result_line)
+            r = invdir.run(site.n, site.s, n_pass=1)
+        except Exception:
+            continue
+        # Only meaningful where the run is reproduced at all: the flag is a
+        # property of OUR psi, so a site whose solution we miss by 70 degrees
+        # would be testing the reproduction, not the rule.
+        va = core.vec_from_trend_plunge(*arch['sigma1'])
+        vb = core.vec_from_trend_plunge(*core.describe(r['T'])['sigma1'])
+        if np.degrees(np.arccos(min(abs(float(va @ vb)), 1.0))) > 3.0:
+            skipped += 1
+            continue
+        tested += 1
+        agree += int(r['psidir_flag'] == flag)
+    print('  runs reproduced to better than 3 deg on sigma1 : %d' % tested)
+    print('  flag predicted correctly                       : %d' % agree)
+    print('  not reproduced well enough to judge            : %d' % skipped)
+    if tested < 30 or agree != tested:
+        fails.append('PSIDIR flag %d/%d' % (agree, tested))
+        print('    FAIL')
+    else:
+        print('    OK')
+else:
+    print('  archive missing, skipped')
+
 print('=' * 74)
 print('FAILURES: %d' % len(fails))
 for f in fails:

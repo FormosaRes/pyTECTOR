@@ -492,12 +492,24 @@ def plot_site(ax, n, s, result=None, certainty=None, sides=None,
     if site_code:
         ax.text(SITE_X, SITE_Y, str(site_code), ha='left', va='center',
                 fontsize=9, family='monospace')
+    # The two captions sit at fixed columns because that is where the original
+    # put them, but the original was drawing letters as pen strokes that
+    # scaled with the plate. These are typeset at a fixed point size, so on a
+    # four-panel window they run into each other and read as
+    # "AS MEASURED  no pyTECTOR". Keep them anchored to opposite edges so they
+    # separate rather than converge, and let fit_captions size them to the
+    # panel they ended up in.
+    ax._caption_items = []
     if header:
-        ax.text(HEADER_X, CAPTION_Y, str(header), ha='left', va='baseline',
-                fontsize=8, family='monospace')
+        ax._caption_items.append(
+            (ax.text(HEADER_X, CAPTION_Y, str(header), ha='left',
+                     va='baseline', fontsize=8, family='monospace'),
+             len(str(header))))
     if program:
-        ax.text(PROGRAM_X, CAPTION_Y, str(program), ha='left', va='baseline',
-                fontsize=8, family='monospace')
+        ax._caption_items.append(
+            (ax.text(FRAME_R, CAPTION_Y, str(program), ha='right',
+                     va='baseline', fontsize=8, family='monospace'),
+             len(str(program))))
 
 
 #: dash patterns: the surface driving the back-tilt is drawn with a longer
@@ -557,20 +569,17 @@ def plot_carried_axes(ax, carried, target=None, lw=None, zorder=10):
     original program itself, the median separation is 10 degrees on sigma1 and
     about 24 degrees on sigma2 and sigma3.
 
-    The reading it has to support is "this axis was here, and re-inverting put
-    it there", so the two ends are given one colour per axis and joined by a
-    solid arc with a head on the answer end and the separation written beside
-    it. The earlier version drew both ends in the same black with a dashed line
-    between, which left the three pairs to be matched up by counting the points
-    on the stars.
+    Monochrome, like everything else here. A coloured version with arrowheads
+    and the separation written on each arc was tried and taken out again: on a
+    four-panel window the extra ink crowded the diagram more than it explained,
+    and the separations are already given as numbers in the report underneath.
     """
     lw = STROKE if lw is None else lw
     for i, key in enumerate(('sigma1', 'sigma2', 'sigma3')):
-        ink = axis_ink(i)
         v = vec_from_trend_plunge(*carried[key])
         X, Y = schmidt(v[None, :])
         ax.plot(X, Y, marker='o', ms=CARRY_MS[i], markerfacecolor='none',
-                markeredgecolor=ink, mew=lw * 1.3, linestyle='none',
+                markeredgecolor=PEN, mew=lw * 0.9, linestyle='none',
                 zorder=zorder, antialiased=AA)
         if target is None:
             continue
@@ -583,25 +592,61 @@ def plot_carried_axes(ax, carried, target=None, lw=None, zorder=10):
         # slerp. Every point is a positive mix of two lower-hemisphere ends, so
         # the arc stays in the lower hemisphere and never has to be split.
         th = np.arccos(c)
-        t = np.linspace(0.0, 1.0, 48)[:, None]
+        t = np.linspace(0.0, 1.0, 24)[:, None]
         p = (np.sin((1 - t) * th) * v + np.sin(t * th) * w) / np.sin(th)
         X, Y = schmidt(p)
-        ax.plot(X, Y, color=ink, lw=lw * 1.1, solid_capstyle='round',
+        ax.plot(X, Y, color=PEN, lw=lw * 0.7, linestyle=(0, (2, 2)),
                 zorder=zorder - 1, antialiased=AA)
-        # a head at the answer end, so the pair reads as a movement and not as
-        # two unrelated marks
-        if len(X) > 3:
-            ax.annotate('', xy=(X[-1], Y[-1]), xytext=(X[-4], Y[-4]),
-                        arrowprops=dict(arrowstyle='-|>', color=ink,
-                                        lw=lw * 1.1, shrinkA=0, shrinkB=0),
-                        zorder=zorder - 1, annotation_clip=False)
-        # and the size of the move, which is the number the window is about
-        j = len(X) // 2
-        ax.annotate('%.0f%s' % (np.degrees(th), DEGREE),
-                    xy=(X[j], Y[j]), xytext=(0, 5),
-                    textcoords='offset points', ha='center', va='bottom',
-                    fontsize=7.5, color=ink, zorder=zorder + 1,
-                    annotation_clip=False)
+
+
+#: data-space extent the axes are given, from draw_frame
+_DATA_W = (FRAME_R - FRAME_L) * 1.06
+_DATA_H = (FRAME_T * 1.04) - (CAPTION_Y * 1.14)
+#: monospace advance width as a fraction of the point size, near enough for
+#: DejaVu Sans Mono and every other fixed-pitch face
+_CHAR_W = 0.62
+
+
+def fit_captions(fig, base=8.0, floor=4.0):
+    """Shrink the bottom captions so they cannot collide.
+
+    Call after the layout is settled, and again on resize. The captions are
+    placed in data coordinates at fixed columns, so as a panel gets physically
+    smaller the same point size eats a larger fraction of the width until the
+    left and right strings overlap. Work out how wide the panel actually is in
+    points and pick a size the pair fits into.
+
+    The axes are aspect-locked, so the drawn data box is whichever of width and
+    height is the binding constraint, not the whole axes rectangle.
+    """
+    fw, fh = fig.get_size_inches()
+    for ax in fig.axes:
+        items = getattr(ax, '_caption_items', None)
+        if not items:
+            continue
+        pos = ax.get_position()
+        scale = min(pos.width * fw / _DATA_W, pos.height * fh / _DATA_H)
+        span_pt = (FRAME_R - FRAME_L) * scale * 72.0
+
+        def fits(entries):
+            chars = sum(k for _t, k in entries) + 3    # +3 for a visible gap
+            return span_pt / (_CHAR_W * max(chars, 1))
+
+        keep = list(items)
+        size = fits(keep)
+        # Below the floor the text is present but unreadable, which is no use
+        # to anyone. Drop the program tag first -- it is the same on every
+        # panel and says nothing about this one -- and give the space to the
+        # caption that identifies the diagram.
+        while size < floor and len(keep) > 1:
+            t, _k = keep.pop()
+            t.set_visible(False)
+            size = fits(keep)
+        for t, _k in items:
+            t.set_visible(t in [x for x, _ in keep])
+        size = max(floor, min(base, size))
+        for t, _k in keep:
+            t.set_fontsize(size)
 
 
 def reference_from_vectors(nvec):

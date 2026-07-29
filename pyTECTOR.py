@@ -642,6 +642,10 @@ class Main(QtWidgets.QMainWindow):
 
         self.fig = Figure(figsize=(11, 5.4), facecolor='white')
         self.canvas = Canvas(self.fig)
+        # captions are sized to the panel they land in, so they
+        # have to be re-sized when the panel changes
+        self.canvas.mpl_connect(
+            'resize_event', lambda _e: plot.fit_captions(self.fig))
         hv.addWidget(self.canvas, 1)
         split.addWidget(holder)
 
@@ -1225,6 +1229,7 @@ class Main(QtWidgets.QMainWindow):
             self.fig.text(0.5, 0.5, 'OUT OF DATE', ha='center', va='center',
                           fontsize=42, color='#C0392B', alpha=0.16,
                           rotation=18, zorder=50)
+        plot.fit_captions(self.fig)
         self.fig.subplots_adjust(left=0.01, right=0.99,
                                  top=0.99 if annotate else 0.88,
                                  bottom=0.14 if annotate else 0.06,

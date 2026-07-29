@@ -84,5 +84,37 @@ print('\n3. too few data to leave one out')
 ok(diagnose.influence(np.eye(3)[:4], np.eye(3)[:4], lambda a, b: np.eye(3))
    == [], 'under five data returns nothing rather than guessing')
 
+print('\n4. the captions shrink instead of colliding')
+# Fixed-point captions at fixed columns overlapped once a panel got small
+# enough: "AS MEASURED  no rotation" ran into "pyTECTOR" and read as
+# "AS MEASURED  no pyTECTOR".
+import matplotlib                                                 # noqa: E402
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt                                   # noqa: E402
+from pytector import plot as _plot                                # noqa: E402
+
+sizes, dropped = [], []
+for w, h in ((11.0, 5.6), (8.4, 4.9), (5.0, 3.0)):
+    fig = plt.figure(figsize=(w, h))
+    for i in range(4):                       # the four-panel case that broke
+        a = fig.add_subplot(2, 2, i + 1)
+        _plot.plot_site(a, [[0.0, 0.0, 1.0]], [[1.0, 0.0, 0.0]], None,
+                        site_code='L12', header='AS MEASURED  no rotation')
+    fig.subplots_adjust(left=0.02, right=0.98, top=0.90, bottom=0.03,
+                        wspace=0.02, hspace=0.28)
+    _plot.fit_captions(fig)
+    items = fig.axes[0]._caption_items
+    sizes.append(items[0][0].get_fontsize())
+    dropped.append(not items[1][0].get_visible())
+    plt.close(fig)
+
+ok(sizes[0] > sizes[-1],
+   'a smaller panel gets smaller captions (%.1f -> %.1f pt)'
+   % (sizes[0], sizes[-1]))
+ok(all(s >= 4.0 for s in sizes),
+   'and never shrinks below the legibility floor (min %.1f pt)' % min(sizes))
+ok(dropped[-1] and not dropped[0],
+   'the program tag is dropped only when there is genuinely no room')
+
 print('\n%d failures' % len(fails))
 sys.exit(1 if fails else 0)

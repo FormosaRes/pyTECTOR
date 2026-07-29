@@ -174,6 +174,38 @@ and no adjustment loop is needed; the search is global. It reaches a lower S₄ 
 So the original program does not reach the minimum of its own criterion, because
 λ stops before it converges.
 
+### λ does not converge, and stopping early is the point
+
+`λ_next` = the taumax of the solution found at `λ`. That is a fixed-point
+iteration, and nothing guarantees it has a fixed point. On **72 of the 92
+archive sites it runs away.** Site 0406-7 is one of them: left to run, λ goes
+0.866 → 1.009 → 1.115 → … → 1.1 × 10⁹ by pass 200, and S₄ degrades from 4 per
+cent above the minimum to 78 per cent above it. On L12 it does settle, at
+λ = 2.2404, reaching 1.5 per cent above the minimum.
+
+The mechanism is a positive feedback. A larger λ asks the solver to match a
+larger shear magnitude, it obliges by inflating the unnormalised tensor, and the
+inflated tensor has a larger taumax, which becomes the next λ.
+
+So `(NO k)` being a **user-chosen pass count** rather than "iterate to
+convergence" is not a shortcut in the original program. On most sites it is the
+only thing keeping the answer finite. The archive bears that out: NO 1 on 62
+sites, NO 2 on 25, and 3 to 5 on the remaining five.
+
+This also means the INVDIR-to-S4MIN gap is not one number. It depends on the
+site and on the pass count that was used:
+
+| | n ≥ 7 (55 sites) | n ≥ 15 (10 sites) |
+|---|---|---|
+| constrained axis | median 8.9°, p90 20.8° | median 4.8°, max 12.5° |
+| \|ΔΦ\| | median 0.074 | median 0.065 |
+| S₄ above the minimum | median 27 % | median 6 % |
+
+0406-7's 4 per cent is at the good end. Note that the S₄ percentage is a poor
+guide at small n: the tensor has four unknowns, so with four or five data the
+global minimum falls to nearly zero and any ratio against it explodes. The angle
+between the axes is the number to read.
+
 ### How far apart do they end up
 
 Comparing only the axis the data actually constrain, σ₁ when Φ < 0.5 and σ₃ when
@@ -603,6 +635,34 @@ CS - 122 - 87W - 124
 它在**全部 92 個 archive 站**都得到更低的 S₄，無一例外
 （L12 0.2360 對 0.3018；0406-7 7.3201 對 7.6198）。
 也就是說，原程式並沒有走到它自己準則的最小值，因為 λ 停在未收斂處。
+
+### ⚠️ λ 迭代不會收斂，而「提早停」正是重點
+
+`λ_next` ＝ 在當前 λ 求得的那個解的 taumax。這是一個不動點迭代，
+而沒有任何東西保證它有不動點。**92 站裡有 72 站會發散。**
+0406-7 就是其中之一：放它一直跑，λ 從 0.866 → 1.009 → 1.115 → … 到第 200 趟變成 1.1 × 10⁹，
+S₄ 從高於最小值 4 % 惡化到高於 78 %。L12 則會收斂，停在 λ = 2.2404，最終高於最小值 1.5 %。
+
+機制是正回饋：λ 變大就是要求解出更大的剪應力，
+求解器照辦的方式是把那個沒有正規化的張量撐大，
+撐大的張量 taumax 又更大，於是變成下一輪的 λ。
+
+所以 `(NO k)` 是**使用者選的趟數**、而不是「迭代到收斂」，在原程式裡不是偷懶。
+在多數站上，那是唯一能讓答案不爆掉的做法。archive 也印證了這件事：
+62 站跑 NO 1、25 站 NO 2、剩下五站是 3 到 5。
+
+這也表示 INVDIR 與 S4MIN 的差距**不是一個固定數字**，它取決於站別與當年用的趟數：
+
+| | n ≥ 7（55 站） | n ≥ 15（10 站） |
+|---|---|---|
+| 受約束的軸 | 中位 8.9°、p90 20.8° | 中位 4.8°、最大 12.5° |
+| \|ΔΦ\| | 中位 0.074 | 中位 0.065 |
+| S₄ 高於最小值 | 中位 27 % | 中位 6 % |
+
+0406-7 的 4 % 是偏好的那一端。
+⚠️ 注意 S₄ 的百分比在 n 小的時候是**壞指標**：張量有四個未知數，
+所以只有四五筆資料時全域最小值會趨近於零，任何跟它相比的比值都會爆掉。
+該讀的是軸與軸之間的夾角。
 
 **兩者差多少**：只看資料真正約束住的那根軸（Φ<0.5 看 σ₁、Φ>0.5 看 σ₃），
 在 n ≥ 7 的 55 站，中位 8.8°、p90 16.7°、最大 28.4°。

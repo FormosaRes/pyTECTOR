@@ -35,8 +35,9 @@ matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 
-from pytector import (about, backtilt, core, entry, hpgl, invdir, modern,
-                      penrec, plot, report, retro, splash, tensorfile)
+from pytector import (about, backtilt, core, diagnose, entry, hpgl, invdir,
+                      modern, penrec, plot, report, retro, splash,
+                      tensorfile)
 from pytector.ui_style import QSS, MUTED
 
 AXES = ('sigma1', 'sigma2', 'sigma3')
@@ -1247,6 +1248,39 @@ class Main(QtWidgets.QMainWindow):
         self._draw()
         self.status.showMessage('saved ' + fn)
 
+    def _diagnostics_text(self):
+        """Which data are badly fitted, which are holding the answer up, and
+        what the solution would be without them.
+
+        Written into the exported INFO1 because that is the file that gets kept
+        and quoted. Excluding a fault is a legitimate thing to do and a silent
+        thing to hide; the difference is entirely whether the alternative is
+        recorded next to the number.
+        """
+        tag, r = self._report_source()
+        if r is None or len(self.active) < 6:
+            return None
+        try:
+            n, s = self.n_s
+            solver = ((lambda a, b: invdir.run(
+                a, b, n_pass=self.sp_pass.value())['T']) if tag == 'A'
+                else (lambda a, b: modern.run(a, b, n_starts=200)['T']))
+            rows = diagnose.combine(r, n, s, solver)
+            out = []
+            hot = [x for x in rows if x['flag']]
+            out.append('data worth checking: %d of %d'
+                       % (len(hot), len(rows)))
+            out.append('')
+            out.append(diagnose.text_table(rows))
+            d = diagnose.disclosure(rows, n, s, solver)
+            if d and d.get('trimmed') is not None:
+                out.append('')
+                out.append('IF THOSE WERE SET ASIDE')
+                out.append(diagnose.disclosure_text(d, rows))
+            return '\n'.join(out)
+        except Exception:
+            return None
+
     def _save_report(self, which):
         r, kw = self._info_kwargs()
         if r is None:
@@ -1260,7 +1294,9 @@ class Main(QtWidgets.QMainWindow):
         # the file gets the full layout, banner and all, so it drops straight
         # in beside the old runs
         if which == 'INFO1':
-            text = report.info1_text(full_header=True, **kw)
+            text = report.info1_text(full_header=True,
+                                     diagnostics=self._diagnostics_text(),
+                                     **kw)
         else:
             text = report.mohr1_text(r, len(self.active),
                                      method=kw['method'], site=kw['site'])

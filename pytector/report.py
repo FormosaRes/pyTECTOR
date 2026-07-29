@@ -168,7 +168,8 @@ def mohr1_display(text):
 
 def info1_text(site_file, res, n_data, invdir=None, lam_invdir=None,
                pass_no=1, weights=None, site='01', method='INVD',
-               acc=9, record=1, full_header=True, compact=False):
+               acc=9, record=1, full_header=True, compact=False,
+               diagnostics=None):
     """INFO1, in the original layout.
 
     res           the final (PSIDIR) solution, from core.summary
@@ -294,4 +295,15 @@ def info1_text(site_file, res, n_data, invdir=None, lam_invdir=None,
         L.append('          -----> END OF SITE %-12s' % site)
         L.append('')
         L.extend(TAIL.format(site=site_file).rstrip('\n').split('\n'))
+    # Appended, never interleaved. Everything above this banner is TENSOR's own
+    # layout and stays byte-for-byte what the original writes, so the file can
+    # still be read back by tensorfile and compared against the archive. What
+    # follows is pyTECTOR's, and is labelled as such rather than left to look
+    # like something Angelier printed.
+    if diagnostics:
+        L.append('')
+        L.append('=' * 74)
+        L.append('  pyTECTOR DIAGNOSTICS - not part of the TENSOR 5.45 format')
+        L.append('=' * 74)
+        L.extend(str(diagnostics).rstrip('\n').split('\n'))
     return '\n'.join(L) + '\n'

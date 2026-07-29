@@ -136,6 +136,36 @@ def mohr1_text(res, n_data, method='INVD', site='01', record=1):
     return '\n'.join(lines) + '\n'
 
 
+def mohr1_display(text):
+    """MOHR1 with column headings, for the screen only.
+
+    The file has none. TENSOR writes the eigenvalue line and then five bare
+    columns of numbers and expects the reader to know the order, which is why
+    INFO1, whose table does carry a heading, is the readable one of the pair. A
+    note beside the pane does not fix that: you still have to count columns to
+    use it.
+
+    So the headings go into the DISPLAY, on the same field widths mohr1_text
+    writes (02 plus four %8.3f, then %10.3f and four %8.3f), and each name sits
+    over its own column. Saving is untouched: the save path rebuilds the text
+    from the solution and never reads the pane, so the file written stays
+    byte-for-byte what the original program would write.
+    """
+    head_02 = '  ' + ''.join('%8s' % h for h in ('S1', 'S2', 'S3', 'Phi'))
+    head_row = '%10s%8s%8s%8s%8s' % ('SIGMN', 'TAU', 'TAUST', 'RUP', 'ANG')
+    units = '%10s%8s%8s%8s%8s' % ('sigma_n', '|tau|', 'tau.s', '(%)', '(deg)')
+    out, done = [], False
+    for ln in text.splitlines():
+        if ln[:2] == '02':
+            out.extend((head_02, ln))
+            continue
+        if not done and ln[:2] != '03' and ln.strip():
+            out.extend((head_row, units))
+            done = True
+        out.append(ln)
+    return '\n'.join(out) + '\n'
+
+
 def info1_text(site_file, res, n_data, invdir=None, lam_invdir=None,
                pass_no=1, weights=None, site='01', method='INVD',
                acc=9, record=1, full_header=True, compact=False):

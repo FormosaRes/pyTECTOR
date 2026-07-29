@@ -63,15 +63,17 @@ CODE = {k: c for k, _nm, c, _d in MODES}
 #: SIGMN and TAU are the Mohr coordinates of the datum, which is what the file
 #: is for.
 MOHR1_KEY = (
-    '<b>02</b> S1 S2 S3 %s &nbsp; principal values (%s S&sup2;=3/2), '
-    '%s=(S2&minus;S3)/(S1&minus;S3) &nbsp;&middot;&nbsp; '
-    'then one line per fault:<br>'
-    '<b>SIGMN</b> σ<sub>n</sub> normal stress &middot; '
-    '<b>TAU</b> |τ| shear &middot; '
-    '<b>TAUST</b> τ·s shear along the striation (=TAU&thinsp;cos&thinsp;ANG) '
-    '&middot; <b>RUP</b> misfit %% &middot; '
-    '<b>ANG</b> striation to predicted shear, %s'
-) % (PHI, '&Sigma;', PHI, DEG)
+    '<b>SIGMN</b> normal stress on the plane &middot; '
+    '<b>TAU</b> shear magnitude &middot; '
+    '<b>TAUST</b> shear along the observed striation (= TAU&thinsp;cos&thinsp;'
+    'ANG) &middot; <b>RUP</b> misfit, 0&ndash;200 %, smaller is better '
+    '&middot; <b>ANG</b> striation to predicted shear in degrees, smaller is '
+    'better. SIGMN and TAU are the point&rsquo;s Mohr coordinates.<br>'
+    '<b>02</b> line: principal values (%s S&sup2; = 3/2) and '
+    '%s = (S2&minus;S3)/(S1&minus;S3). '
+    '<i>Column names are added here for reading; the file itself has none, '
+    'and saving is unaffected.</i>'
+) % ('&Sigma;', PHI)
 
 MOHR1_TIP = (
     'MOHR1, five columns per fault, in this order:\n\n'
@@ -1103,9 +1105,11 @@ class Main(QtWidgets.QMainWindow):
         # the panel shows the substance only; the banner and the file-handling
         # lines belong in the exported file, not on screen
         self.txt_info.setPlainText(report.info1_text(compact=True, **kw))
-        self.txt_mohr.setPlainText(
+        # headings are added for the screen; Save MOHR1 rebuilds the text from
+        # the solution, so the file written is unaffected
+        self.txt_mohr.setPlainText(report.mohr1_display(
             report.mohr1_text(r, len(self.active), method=kw['method'],
-                              site=kw['site']))
+                              site=kw['site'])))
 
     # ------------------------------------------------------------ context --
     def _fingerprint(self):

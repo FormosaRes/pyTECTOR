@@ -31,7 +31,8 @@ matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 
-from . import core, entry, invdir, modern, plot, rotate, tensorfile, tilt, tiltui
+from . import (core, entry, hpgl, invdir, modern, penrec, plot, rotate,
+               tensorfile, tilt, tiltui)
 
 DEG = '°'
 PHI = 'Φ'
@@ -48,30 +49,37 @@ def _run(key, n, s, n_pass):
         r = modern.run(n, s, n_starts=400)
     out = core.summary(r['T'], n, s)
     out['T'] = r['T']
+    # only INVDIR has a PSIDIR stage, so only INVDIR can permute its axes
+    out['permutation'] = r.get('permutation')
+    out['psidir_flag'] = r.get('psidir_flag')
+    out['phi_invdir'] = r['invdir']['phi'] if 'invdir' in r else None
     return out
 
 
 class Solver(QtCore.QThread):
-    """Both states in one background run, so the pair on screen always comes
-    from the same data and the same settings."""
-    done = QtCore.pyqtSignal(object)
-    failed = QtCore.pyqtSignal(str)
+    """Runs a list of jobs off the GUI thread.
 
-    def __init__(self, n, s, rn, rs, keys, n_pass, parent=None):
+    Carries a generation number so that results from a superseded run can be
+    dropped on arrival. Dragging the angle slider starts a new solve on every
+    step, and without this an early slow one could land after a later fast one
+    and leave the screen showing an angle the user has already moved past.
+    """
+    done = QtCore.pyqtSignal(object, int)
+    failed = QtCore.pyqtSignal(str, int)
+
+    def __init__(self, jobs, n_pass, gen, parent=None):
         super(Solver, self).__init__(parent)
-        self.n, self.s, self.rn, self.rs = n, s, rn, rs
-        self.keys, self.n_pass = keys, n_pass
+        self.jobs, self.n_pass, self.gen = jobs, n_pass, gen
 
     def run(self):
         try:
             out = {}
-            for k in self.keys:
-                out['raw_' + k] = _run(k, self.n, self.s, self.n_pass)
-                out['rot_' + k] = _run(k, self.rn, self.rs, self.n_pass)
-            self.done.emit(out)
+            for slot, key, n, s in self.jobs:
+                out[slot] = _run(key, n, s, self.n_pass)
+            self.done.emit(out, self.gen)
         except Exception:
             import traceback
-            self.failed.emit(traceback.format_exc())
+            self.failed.emit(traceback.format_exc(), self.gen)
 
 
 def carried(result, trend, plunge, angle):
@@ -110,6 +118,12 @@ class BackTiltWindow(QtWidgets.QDialog):
         self.results = {}
         self.rot = None
         self.worker = None
+        self._gen = 0            # newest solve; older ones are discarded
+        self._syncing = False    # slider <-> field, stop the echo
+        self._timer = QtCore.QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.setInterval(90)
+        self._timer.timeout.connect(lambda: self._solve(live=True))
         self._build()
         self.reload()
 
@@ -166,6 +180,34 @@ class BackTiltWindow(QtWidgets.QDialog):
         row.addStretch(1)
         bv.addLayout(row)
 
+        # The angle is the one parameter with no analytical answer: it is found
+        # by trying values and watching the axes move. A slider is the honest
+        # control for that, and the axes have to keep up with it.
+        row = QtWidgets.QHBoxLayout()
+        row.setSpacing(6)
+        lab = QtWidgets.QLabel('angle')
+        lab.setObjectName('legend')
+        lab.setFixedWidth(38)
+        row.addWidget(lab)
+        self.sl_angle = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.sl_angle.setRange(-90, 90)
+        self.sl_angle.setValue(0)
+        self.sl_angle.setPageStep(5)
+        self.sl_angle.setTickInterval(15)
+        self.sl_angle.setTickPosition(QtWidgets.QSlider.TicksBelow)
+        self.sl_angle.setToolTip(
+            'Rotation angle, right-hand rule about the axis. Drag it: the '
+            'stress axes are recomputed as you go.')
+        self.sl_angle.valueChanged.connect(self._slider_moved)
+        row.addWidget(self.sl_angle, 1)
+        self.cb_live = QtWidgets.QCheckBox('recompute while dragging')
+        self.cb_live.setChecked(True)
+        self.cb_live.setToolTip(
+            'Re-invert on every slider step. Turn off on very large data sets '
+            'if the drag becomes uneven.')
+        row.addWidget(self.cb_live)
+        bv.addLayout(row)
+
         self.lbl_rot = QtWidgets.QLabel('')
         self.lbl_rot.setObjectName('legend')
         self.lbl_rot.setWordWrap(True)
@@ -207,6 +249,12 @@ class BackTiltWindow(QtWidgets.QDialog):
         b = QtWidgets.QPushButton('Save PNG')
         b.clicked.connect(self.save_png)
         row.addWidget(b)
+        self.btn_hpgl = QtWidgets.QPushButton('Save HPGL')
+        self.btn_hpgl.setToolTip(
+            'Write the back-tilted stereogram as HPGL, the same pen-plotter '
+            'vector format the original program produced.')
+        self.btn_hpgl.clicked.connect(self.save_hpgl)
+        row.addWidget(self.btn_hpgl)
         bv.addLayout(row)
         lay.addWidget(box)
 
@@ -287,7 +335,18 @@ class BackTiltWindow(QtWidgets.QDialog):
         return out
 
     # --------------------------------------------------------- rotation --
-    def _changed(self, *_a):
+    def _slider_moved(self, value):
+        """The slider owns the angle field; dragging it implies axis mode."""
+        if self._syncing:
+            return
+        if self.cmb_src.currentIndex() != 1:
+            self.cmb_src.setCurrentIndex(1)
+        self._syncing = True
+        self.fields[2].setText('%d' % value)
+        self._syncing = False
+        self._changed(live=True)
+
+    def _changed(self, *_a, **kw):
         """Work out the rotation from whichever source is selected.
 
         The angle is the user's call. There is no analytical solution for it:
@@ -295,6 +354,7 @@ class BackTiltWindow(QtWidgets.QDialog):
         the archive folders are named after what was tried. This only makes
         trying quick, and keeps the rotation in force visible.
         """
+        live = bool(kw.get('live'))
         axis_mode = self.cmb_src.currentIndex() == 1
         vals = []
         for e in self.fields:
@@ -304,6 +364,12 @@ class BackTiltWindow(QtWidgets.QDialog):
                 vals.append(float(txt) if txt else None)
             except ValueError:
                 vals.append(None)
+
+        self.sl_angle.setEnabled(axis_mode)
+        if axis_mode and not self._syncing and vals[2] is not None:
+            self._syncing = True
+            self.sl_angle.setValue(int(round(max(-90.0, min(90.0, vals[2])))))
+            self._syncing = False
 
         frac = self.sp_frac.value() / 100.0
         self.rot, note = None, ''
@@ -341,8 +407,13 @@ class BackTiltWindow(QtWidgets.QDialog):
         ok = bool(self.rot) and n >= 4
         self.btn_run.setEnabled(ok)
         self.btn_tilt.setEnabled(ok)
-        self.results = {}
+        # the as-measured half does not depend on the rotation, so keep it:
+        # that is what makes dragging cheap enough to do live
+        self.results = dict((k, v) for k, v in self.results.items()
+                            if k.startswith('raw_'))
         self._draw()
+        if live and ok and self.cb_live.isChecked():
+            self._timer.start()
 
     # -------------------------------------------------------- inversion --
     def keys(self):
@@ -350,6 +421,11 @@ class BackTiltWindow(QtWidgets.QDialog):
                 if c.isChecked()]
 
     def invert(self):
+        self._solve(live=False)
+
+    def _solve(self, live=False):
+        """Queue whatever is missing. Only the rotated half is ever recomputed
+        on a drag; the as-measured half is solved once and kept."""
         if not self.rot or len(self.records) < 4:
             return
         keys = self.keys()
@@ -357,22 +433,40 @@ class BackTiltWindow(QtWidgets.QDialog):
             return
         n, s = self.n_s
         rn, rs = rotate.rotate_site(n, s, *self.rot)
-        self.btn_run.setEnabled(False)
-        self.progress.show()
-        self.worker = Solver(n, s, rn, rs, keys, self.n_pass, self)
-        self.worker.done.connect(self._finished)
-        self.worker.failed.connect(self._failed)
-        self.worker.start()
+        jobs = []
+        for k in keys:
+            if ('raw_' + k) not in self.results:
+                jobs.append(('raw_' + k, k, n, s))
+            jobs.append(('rot_' + k, k, rn, rs))
 
-    def _failed(self, msg):
+        self._gen += 1
+        if not live:
+            self.btn_run.setEnabled(False)
+            self.progress.show()
+        w = Solver(jobs, self.n_pass, self._gen, self)
+        w.done.connect(self._finished)
+        w.failed.connect(self._failed)
+        # hold a reference until it has actually stopped, or Qt may collect a
+        # running thread out from under itself
+        self._workers = [x for x in getattr(self, '_workers', [])
+                         if x.isRunning()]
+        self._workers.append(w)
+        self.worker = w
+        w.start()
+
+    def _failed(self, msg, gen):
+        if gen != self._gen:
+            return
         self.btn_run.setEnabled(True)
         self.progress.hide()
         QtWidgets.QMessageBox.critical(self, 'pyTECTOR', msg)
 
-    def _finished(self, out):
+    def _finished(self, out, gen):
+        if gen != self._gen:
+            return          # the slider has already moved past this one
         self.btn_run.setEnabled(True)
         self.progress.hide()
-        self.results = out
+        self.results.update(out)
         self._draw()
         self.txt.setPlainText(self.summary())
 
@@ -428,6 +522,14 @@ class BackTiltWindow(QtWidgets.QDialog):
             if m1 > m0 + 2:
                 L.append('%-22s the axes moved AWAY from horizontal and '
                          'vertical: this rotation is not supported' % '')
+            # PSIDIR relabels the frozen axes whenever its psi leaves the last
+            # 60 degrees of the turn. TENSOR prints this on the PSIDIR line.
+            for lab, r in (('as measured', raw), ('restored', rot)):
+                if r.get('permutation'):
+                    L.append('%-22s PSIDIR %s: sigma1/2/3 are NOT INVDIR\'s '
+                             'labels (INVDIR Phi %.3f -> %.3f)'
+                             % ('', lab, r.get('phi_invdir') or float('nan'),
+                                r['phi']))
             L.append('')
 
         L.append('The ring is the measured answer carried through the '
@@ -461,7 +563,20 @@ class BackTiltWindow(QtWidgets.QDialog):
         keys = [k for k in self.keys() if ('raw_' + k) in self.results] \
             or [None]
         rows = len(keys)
-        conf, sides = self.certainty, self.sides
+        conf = self.certainty
+        # Two separate things have to be redone for the restored panel.
+        #
+        # The convention. Where a plane has been turned through the vertical
+        # its pole changes hemisphere, the upward side of the plane becomes the
+        # other block, and the stored slip vector now describes the opposite
+        # movement. Drawn straight, a left-lateral couple comes out
+        # right-lateral. canonicalise() flips those pairs back.
+        rn, rs = rotate.canonicalise(rn, rs)
+        # The side the barb sits on, which is orientation-dependent in its own
+        # right and reverses for any datum whose slip passes through pure
+        # dip-slip, about 20 per cent of archive data at the usual angles.
+        sides = plot.strike_slip_sign_vectors(n, s)
+        sides_rot = plot.strike_slip_sign_vectors(rn, rs)
         tag = '' if self.rot is None else '  %03.0f/%02.0f %+.0f' % self.rot
         title_colour = '#1E1E1C' if plot.PEN == 'k' else plot.PEN
 
@@ -491,7 +606,7 @@ class BackTiltWindow(QtWidgets.QDialog):
 
             ax = cell(2 * j + 2, 'BACK-TILTED' + ('   ' + name if name else ''),
                       tag.strip() or 'no rotation set')
-            plot.plot_site(ax, rn, rs, rot, certainty=conf, sides=sides,
+            plot.plot_site(ax, rn, rs, rot, certainty=conf, sides=sides_rot,
                            site_code=self.site_name,
                            reference=self.reference_now(True),
                            declination=self.decl,
@@ -506,6 +621,41 @@ class BackTiltWindow(QtWidgets.QDialog):
                                  bottom=0.10 if annotate else 0.04,
                                  wspace=0.02, hspace=0.28)
         self.canvas.draw()
+
+    def save_hpgl(self):
+        """The restored stereogram as HPGL, the format the original plotted in.
+
+        Replays plot_site through the pen recorder rather than emitting a
+        second, shorter drawing routine, so the file carries what the figure
+        carries: striae, ticks, centre cross, N and M, frame, arrows and
+        reference surfaces. The as-measured panel is the main window's Save
+        HPGL; this is the back-tilted one, named the way the archive names it.
+        """
+        n, s = self.n_s
+        if not len(n) or not self.rot:
+            QtWidgets.QMessageBox.information(
+                self, 'pyTECTOR', 'Set a rotation first.')
+            return
+        default = '%s %s.hpgl' % (self.site_name, rotate.describe(*self.rot))
+        fn, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, 'Save back-tilted HPGL', default, 'HPGL (*.hpgl)')
+        if not fn:
+            return
+        rn, rs = rotate.rotate_site(n, s, *self.rot)
+        rn, rs = rotate.canonicalise(rn, rs)
+        key = self.keys()
+        res = self.results.get('rot_' + key[0]) if key else None
+        rec = penrec.Recorder()
+        plot.plot_site(rec, rn, rs, res, certainty=self.certainty,
+                       sides=plot.strike_slip_sign_vectors(rn, rs),
+                       site_code=self.site_name,
+                       reference=self.reference_now(True),
+                       declination=self.decl,
+                       header='BACK-TILTED  %03.0f/%02.0f %+.0f' % self.rot)
+        rec.emit(hpgl.Writer()).save(fn)
+        QtWidgets.QMessageBox.information(
+            self, 'pyTECTOR',
+            'saved %s\n%d vectors' % (fn, len(rec.polylines)))
 
     def save_png(self):
         fn, _ = QtWidgets.QFileDialog.getSaveFileName(

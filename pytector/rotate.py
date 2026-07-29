@@ -96,6 +96,39 @@ def rotate_site(n, s, trend_deg, plunge_deg, angle_deg):
     return n2, s2
 
 
+def canonicalise(n, s):
+    """Put a rotated data set back into the convention everything else assumes.
+
+    A rotation carries the normal and the slip vector rigidly, so the datum is
+    unchanged and the inversion cannot tell the difference. The DRAWING can.
+    The stored slip vector means "motion of the block on the upward side of the
+    plane", and when a back-tilt turns a plane through the vertical, the pole
+    crosses the horizontal and that upward side becomes the other block. The
+    same physical movement is then written the other way round, and a symbol
+    drawn from the un-flipped vector points backwards: a left-lateral couple is
+    drawn as right-lateral and the reverse.
+
+    So flip the pair wherever the rotated normal has ended up pointing down.
+    as_records() already does this when writing a site file out; this is the
+    same step for everything that draws.
+    """
+    n = np.atleast_2d(np.asarray(n, float))
+    s = np.atleast_2d(np.asarray(s, float))
+    up = np.where(n[:, 2] >= 0, 1.0, -1.0)[:, None]
+    return n * up, s * up
+
+
+def crossed_over(n, rn):
+    """Per datum: did this plane turn through the vertical during the rotation.
+
+    True where the pole changed hemisphere, which is exactly where
+    canonicalise() has to flip the pair.
+    """
+    n = np.atleast_2d(np.asarray(n, float))
+    rn = np.atleast_2d(np.asarray(rn, float))
+    return (n[:, 2] >= 0) != (rn[:, 2] >= 0)
+
+
 def as_records(n, s):
     """Turn rotated vectors back into dip azimuth / dip / rake, so the result
     can be written out as an ordinary TENSOR site file."""

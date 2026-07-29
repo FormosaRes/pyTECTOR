@@ -118,5 +118,117 @@ if os.path.exists(ROOT):
 else:
     print('   archive missing, skipped')
 
+
+print('\n6. the drawn slip sense is recomputed, not carried over')
+from pytector import plot
+
+# The vector form must agree with the record form exactly on unrotated data,
+# or it is not the same quantity.
+if os.path.exists(ROOT):
+    disagree = total = 0
+    for p in tensorfile.discover(ROOT):
+        try:
+            st = tensorfile.read_site(p)
+        except Exception:
+            continue
+        if not len(st):
+            continue
+        disagree += int((st.sides
+                         != plot.strike_slip_sign_vectors(st.n, st.s)).sum())
+        total += len(st)
+    ok(disagree == 0 and total > 500,
+       'vector form matches the record form on %d archive data (%d disagree)'
+       % (total, disagree))
+else:
+    print('   archive missing, skipped the archive half')
+
+# Turning a plane past vertical redescribes it with a dip azimuth 180 degrees
+# away and swaps hanging wall for footwall. That does NOT by itself change the
+# drawn side: it reverses the strike direction and the slip vector together, so
+# the product survives. The side is convention-free.
+rng = np.random.default_rng(0)
+rn_ = rng.normal(size=(4000, 3))
+rn_ /= np.linalg.norm(rn_, axis=1, keepdims=True)
+rs_ = rng.normal(size=(4000, 3))
+rs_ -= np.einsum('ki,ki->k', rs_, rn_)[:, None] * rn_
+rs_ /= np.linalg.norm(rs_, axis=1, keepdims=True)
+ok(np.array_equal(plot.strike_slip_sign_vectors(rn_, rs_),
+                  plot.strike_slip_sign_vectors(-rn_, -rs_)),
+   'the hanging-wall/footwall swap cancels: side is convention-free')
+
+# What DOES change it is the rotation itself. The strike-slip component is
+# orientation-dependent, so data whose slip is near pure dip-slip cross zero
+# and reverse. Carrying the measured side over to the rotated panel draws
+# those couples mirrored, which is the bug this replaces.
+if os.path.exists(ROOT):
+    changed = seen = 0
+    for p in tensorfile.discover(ROOT):
+        try:
+            st = tensorfile.read_site(p)
+        except Exception:
+            continue
+        if len(st) < 4:
+            continue
+        for spec in ((20, 0, -20), (0, 0, 30), (80, 0, -30), (20, 0, -40)):
+            a, b = rotate.rotate_site(st.n, st.s, *spec)
+            changed += int((st.sides
+                            != plot.strike_slip_sign_vectors(a, b)).sum())
+            seen += len(st)
+    pct = 100.0 * changed / max(seen, 1)
+    ok(pct > 5.0,
+       'rotation really does reverse the side for a solid fraction of data '
+       '(%d of %d, %.1f%%)' % (changed, seen, pct))
+
+print('\n7. turning a plane through the vertical rewrites its sense')
+# The stored slip vector means "motion of the block on the upward side". Turn
+# the plane through vertical and that side becomes the other block, so the same
+# movement is written the other way round. Drawn un-flipped it reads backwards.
+if os.path.exists(ROOT):
+    from pytector import invdir
+    crossed = total = 0
+    for p in tensorfile.discover(ROOT):
+        try:
+            st = tensorfile.read_site(p)
+        except Exception:
+            continue
+        if not len(st):
+            continue
+        for spec in ((20, 0, -20), (0, 0, 30), (80, 0, -30), (20, 0, -40)):
+            a, b = rotate.rotate_site(st.n, st.s, *spec)
+            crossed += int(rotate.crossed_over(st.n, a).sum())
+            total += len(st)
+    ok(crossed > 0.05 * total,
+       'planes really do cross the vertical (%d of %d, %.1f%%)'
+       % (crossed, total, 100.0 * crossed / total))
+
+    site = tensorfile.read_site(os.path.join(ROOT, '0406-7', '0406-04'))
+    rn, rs = rotate.rotate_site(site.n, site.s, 20, 0, -40)
+    cn, cs = rotate.canonicalise(rn, rs)
+    flip = rotate.crossed_over(site.n, rn)
+    ok(flip.any(), 'the test site has data that cross over (%d of %d)'
+       % (int(flip.sum()), len(site)))
+    ok(np.allclose(cn[flip], -rn[flip]) and np.allclose(cs[flip], -rs[flip]),
+       'canonicalise flips exactly those pairs, normal and slip together')
+    ok(np.allclose(cn[~flip], rn[~flip]) and np.allclose(cs[~flip], rs[~flip]),
+       'and leaves the rest alone')
+    # the pair is flipped together, so the datum is unchanged and the answer
+    # must not move at all
+    a = core.describe(invdir.run(rn, rs, n_pass=1)['T'])['sigma1']
+    b = core.describe(invdir.run(cn, cs, n_pass=1)['T'])['sigma1']
+    ok(abs(a[0] - b[0]) < 1e-6 and abs(a[1] - b[1]) < 1e-6,
+       'the inversion cannot tell the difference, so this is drawing only')
+else:
+    print('   archive missing, skipped')
+
+# n and s turn together, so the datum is physically unchanged and the
+# inversion is blind to all of this. It is a drawing concern only.
+n0 = core.normal_from_dipaz([10.0], [80.0])
+s0 = core.slip_from_rake([10.0], [80.0], [20.0])
+s0 = s0 - np.einsum('ki,ki->k', s0, n0)[:, None] * n0
+s0 = s0 / np.linalg.norm(s0, axis=1, keepdims=True)
+ra, rb = rotate.rotate_site(n0, s0, 100.0, 0.0, 40.0)
+ok(abs(float(np.einsum('ki,ki->k', ra, rb)[0])) < 1e-12,
+   'slip stays in its plane, so the inversion never saw any of it')
+
 print('\n%d failures' % len(fails))
 sys.exit(1 if fails else 0)

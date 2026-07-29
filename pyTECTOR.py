@@ -56,6 +56,60 @@ MODES = (
 NAME = {k: nm for k, nm, _c, _d in MODES}
 CODE = {k: c for k, _nm, c, _d in MODES}
 
+#: MOHR1 is the one output with no header of its own: the original writes the
+#: eigenvalue line, then five bare columns per fault, and expects the reader to
+#: know the order. Decoded 2026-07-28 against L12 and 0406-7 and cross-checked
+#: column by column against the same sites' INFO1, which does print names.
+#: SIGMN and TAU are the Mohr coordinates of the datum, which is what the file
+#: is for.
+MOHR1_KEY = (
+    '<b>02</b> S1 S2 S3 %s &nbsp; principal values (%s S&sup2;=3/2), '
+    '%s=(S2&minus;S3)/(S1&minus;S3) &nbsp;&middot;&nbsp; '
+    'then one line per fault:<br>'
+    '<b>SIGMN</b> σ<sub>n</sub> normal stress &middot; '
+    '<b>TAU</b> |τ| shear &middot; '
+    '<b>TAUST</b> τ·s shear along the striation (=TAU&thinsp;cos&thinsp;ANG) '
+    '&middot; <b>RUP</b> misfit %% &middot; '
+    '<b>ANG</b> striation to predicted shear, %s'
+) % (PHI, '&Sigma;', PHI, DEG)
+
+MOHR1_TIP = (
+    'MOHR1, five columns per fault, in this order:\n\n'
+    '  SIGMN   normal stress on the fault plane, sigma_n = n.T.n\n'
+    '  TAU     magnitude of the shear stress, |tau|\n'
+    '  TAUST   shear resolved along the OBSERVED striation, s.tau\n'
+    '          equals TAU x cos(ANG), so TAUST <= TAU always\n'
+    '  RUP     misfit, 100|upsilon|/lambda with lambda = sqrt(3)/2.\n'
+    '          Runs 0 to 200 per cent. Angelier: under 50 acceptable,\n'
+    '          under 25 good. SMALLER IS BETTER.\n'
+    '  ANG     angle between the observed striation and the shear the\n'
+    '          solution predicts, in degrees. SMALLER IS BETTER.\n\n'
+    'The 02 line holds the three principal values of the normalised\n'
+    'tensor (sum of squares = 3/2) and the shape ratio Phi.\n\n'
+    'SIGMN and TAU are exactly the x and y of the point on the Mohr\n'
+    'diagram; that is what the file was written for.\n\n'
+    'MOHR1 does not carry SIGMA, RMU or OBL. INFO1 does.')
+
+INFO1_KEY = (
+    'Per fault: <b>SIGMA</b> |σ| &middot; <b>SIGMN</b> σ<sub>n</sub> &middot; '
+    '<b>TAU</b> |τ| &middot; <b>TAUST</b> τ·s &middot; '
+    '<b>RMU</b> |τ|/|σ<sub>n</sub>| &middot; '
+    '<b>RUP</b> misfit % &middot; <b>OBL</b> arctan(|σ<sub>n</sub>|/|τ|) '
+    '&middot; <b>ANG</b> striation to predicted shear. '
+    'First four are &times;100. RUP and ANG: smaller is better.'
+)
+
+INFO1_TIP = (
+    'INFO1 prints its own column header, and adds three columns that\n'
+    'MOHR1 leaves out:\n\n'
+    '  SIGMA   magnitude of the whole stress vector on the plane, |T.n|\n'
+    '  RMU     |tau| / |sigma_n|, a friction-like ratio, printed x100\n'
+    '  OBL     obliquity, arctan(|sigma_n|/|tau|), in degrees\n\n'
+    'The first four columns are scaled by 100.\n\n'
+    'In the summary block, RUP <75 and ANG <45 are two DIFFERENT\n'
+    'statistics: the first is over all data, the second only over the\n'
+    'subset below the threshold. They are not the same column twice.')
+
 
 def heading(text):
     lab = QtWidgets.QLabel(text.upper())
@@ -613,12 +667,38 @@ class Main(QtWidgets.QMainWindow):
             t.setReadOnly(True)
             t.setObjectName('report')          # picks up the monospace rule
             t.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
-        self.tabs.addTab(self.txt_info, 'INFO1')
-        self.tabs.addTab(self.txt_mohr, 'MOHR1')
+        self.tabs.addTab(self._report_tab(self.txt_info, INFO1_KEY, INFO1_TIP),
+                         'INFO1')
+        self.tabs.addTab(self._report_tab(self.txt_mohr, MOHR1_KEY, MOHR1_TIP),
+                         'MOHR1')
         split.addWidget(self.tabs)
         split.setStretchFactor(0, 3)
         split.setSizes([560, 330])
         return split
+
+    def _report_tab(self, pane, key, tip):
+        """A report pane with its column key above it.
+
+        MOHR1 carries no header of its own -- the original writes five bare
+        columns of numbers and expects you to know the order -- so without this
+        the tab is unreadable unless you already know the format. The key lives
+        in a label rather than in the text because the text has to stay a
+        byte-for-byte match for what TENSOR writes.
+        """
+        page = QtWidgets.QWidget()
+        v = QtWidgets.QVBoxLayout(page)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(3)
+        lab = QtWidgets.QLabel(key)
+        lab.setObjectName('legend')
+        lab.setWordWrap(True)
+        lab.setTextFormat(QtCore.Qt.RichText)
+        lab.setContentsMargins(6, 4, 6, 0)
+        lab.setToolTip(tip)
+        pane.setToolTip(tip)
+        v.addWidget(lab)
+        v.addWidget(pane, 1)
+        return page
 
     # -------------------------------------------------- reference planes --
     def _ptype_changed(self, *_a):

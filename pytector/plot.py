@@ -269,6 +269,36 @@ def strike_slip_sign(dipaz_deg, dip_deg, rake_deg):
     return np.where(v >= 0, 1.0, -1.0)
 
 
+def strike_slip_sign_vectors(n, s):
+    """The same sign, taken straight off the vectors instead of off records.
+
+    This has to be RECOMPUTED after a rotation, never carried over from the
+    measured records. The quantity is the sense of the strike-slip component,
+    and a rotation moves both the slip vector and the plane's strike line, so
+    for any datum whose slip is near pure dip-slip the component passes through
+    zero and reverses. Over the 92 archive sites and eight trial back-tilts,
+    14.6 per cent of all data reverse it, and 53 of the 92 sites have at least
+    one datum that does. Reusing the measured sign draws those couples mirrored.
+
+    Note what is NOT the reason. A rotation can also turn a plane past vertical,
+    which redescribes it with a dip azimuth 180 degrees away and swaps hanging
+    wall for footwall. That swap is self-cancelling here: it reverses the strike
+    direction and the slip vector together, so the product is unchanged (checked
+    on 4000 random data, 0 changes). The drawn side is convention-free; it is
+    genuinely orientation-dependent, which is a different thing.
+
+    Because n and s turn together, the datum is physically unchanged and the
+    inversion never saw any of this. It is a drawing concern only.
+    """
+    n = np.atleast_2d(np.asarray(n, float))
+    s = np.atleast_2d(np.asarray(s, float))
+    up = np.where(n[:, 2] >= 0, 1.0, -1.0)[:, None]    # normal turned upward
+    v, si = n * up, s * up
+    a = np.arctan2(v[:, 0], v[:, 1]) - np.pi / 2       # strike direction
+    strike = np.stack([np.sin(a), np.cos(a), np.zeros(len(a))], axis=1)
+    return np.where(np.einsum('ki,ki->k', si, strike) >= 0, 1.0, -1.0)
+
+
 #: an axis only gets its heavy arrow pair if it is shallow enough for a
 #: horizontal direction to mean anything. Checked against the originals:
 #: L12 draws both pairs (sigma1 36 deg, sigma3 44 deg), 0406-7 draws only the

@@ -294,8 +294,58 @@ class BackTiltWindow(QtWidgets.QDialog):
             self.decl = float(m.ed_decl.text().strip())
         except (AttributeError, ValueError):
             self.decl = plot.MAGNETIC_OFFSET
+        # The as-measured half does not depend on the rotation, and the main
+        # window has usually just computed it. Adopt it rather than showing an
+        # empty diagram and making the user press Invert to see an answer that
+        # already exists.
         self.results = {}
+        self._adopt_main_results()
         self._changed()
+
+    def _adopt_main_results(self):
+        """Take the main window's as-measured solution if we have none."""
+        m = self.main
+        got = False
+        for k in ('A', 'B'):
+            r = getattr(m, 'results', {}).get(k) if m else None
+            if r is not None and ('raw_' + k) not in self.results:
+                self.results['raw_' + k] = r
+                got = True
+        return got
+
+    def showEvent(self, ev):
+        """Shown again. Pick up anything new, but do NOT reload: this also
+        fires when the window is restored from minimised, and a reload would
+        throw away an inversion the user is in the middle of reading. A genuine
+        reopen goes through the main window, which calls reload itself."""
+        super(BackTiltWindow, self).showEvent(ev)
+        if self._adopt_main_results():
+            self._draw()
+            self.txt.setPlainText(self.summary())
+        self._sync_planes()
+
+    def changeEvent(self, ev):
+        """Brought back to the front: pick up reference surfaces added in the
+        main window in the meantime.
+
+        Only the surfaces, not the fault data, so an inversion already on
+        screen is not thrown away just because the user clicked between
+        windows. Marking a reference plane next door and finding this window
+        still saying there is none was the whole of the problem.
+        """
+        super(BackTiltWindow, self).changeEvent(ev)
+        if ev.type() == QtCore.QEvent.ActivationChange and self.isActiveWindow():
+            self._sync_planes()
+
+    def _sync_planes(self):
+        m = self.main
+        if m is None:
+            return
+        planes = [dict(p) for p in m.planes]
+        if planes == self.planes:
+            return
+        self.planes = planes
+        self._changed(live=self.cb_live.isChecked())
 
     @property
     def ref_plane(self):
@@ -382,13 +432,22 @@ class BackTiltWindow(QtWidgets.QDialog):
         else:
             ref = self.ref_plane
             if ref is None:
-                note = ('mark a reference surface in the main window, then '
-                        'press Reload data')
+                note = ('no reference surface: mark one in the main window '
+                        '(it appears here as soon as you come back)')
             else:
                 t, p, a = rotate.restores_to_horizontal(*ref)
                 self.rot = (t, p, a * frac)
-                note = ('reference surface  dip az %03.0f / %02.0f'
-                        % (ref[0], ref[1]))
+                # Say what the rotation actually does to the reference surface,
+                # rather than asking anyone to take it on trust. At 100 per
+                # cent the restored dip must read 00.
+                v = core.normal_from_dipaz(ref[0], ref[1])
+                v = rotate.rotate_vectors(np.atleast_2d(v), *self.rot)[0]
+                raz, rdip = plot.reference_from_vectors(v)
+                note = ('reference surface %03.0f/%02.0f  ->  %03.0f/%02.0f'
+                        % (ref[0], ref[1], raz, rdip))
+                if frac == 1.0:
+                    note += ('  (flat)' if rdip < 0.5
+                             else '  NOT FLAT - this is a bug, please report')
 
         if self.rot is None:
             self.lbl_rot.setText(note)
@@ -404,8 +463,9 @@ class BackTiltWindow(QtWidgets.QDialog):
             % (self.site_name, n, '' if n == 1 else 's',
                'no rotation set' if self.rot is None
                else rotate.describe(*self.rot)))
+        # the as-measured half is invertible with no rotation set at all
         ok = bool(self.rot) and n >= 4
-        self.btn_run.setEnabled(ok)
+        self.btn_run.setEnabled(n >= 4)
         self.btn_tilt.setEnabled(ok)
         # the as-measured half does not depend on the rotation, so keep it:
         # that is what makes dragging cheap enough to do live
@@ -426,18 +486,22 @@ class BackTiltWindow(QtWidgets.QDialog):
     def _solve(self, live=False):
         """Queue whatever is missing. Only the rotated half is ever recomputed
         on a drag; the as-measured half is solved once and kept."""
-        if not self.rot or len(self.records) < 4:
+        if len(self.records) < 4:
             return
         keys = self.keys()
         if not keys:
             return
         n, s = self.n_s
-        rn, rs = rotate.rotate_site(n, s, *self.rot)
         jobs = []
         for k in keys:
             if ('raw_' + k) not in self.results:
                 jobs.append(('raw_' + k, k, n, s))
-            jobs.append(('rot_' + k, k, rn, rs))
+        if self.rot:
+            rn, rs = rotate.rotate_site(n, s, *self.rot)
+            for k in keys:
+                jobs.append(('rot_' + k, k, rn, rs))
+        if not jobs:
+            return
 
         self._gen += 1
         if not live:
@@ -494,8 +558,26 @@ class BackTiltWindow(QtWidgets.QDialog):
     def summary(self):
         """The numbers behind the two diagrams, and what they do and do not
         show. Written out rather than left to be inferred from the plots."""
-        if not self.results or not self.rot:
+        if not self.results:
             return ''
+        if not self.rot:
+            # no rotation yet: still worth reading the measured answer
+            L = ['NO ROTATION SET.  The as-measured solution only.', '']
+            L.append('%-22s %-9s %-9s %-9s %-7s %-6s %-8s %s'
+                     % ('', 'sigma1', 'sigma2', 'sigma3', 'Phi', 'ANG',
+                        'S4', 'Andersonian misfit'))
+            for k, name, _d in METHODS:
+                r = self.results.get('raw_' + k)
+                if not r:
+                    continue
+                m, regime, _ax = tilt.andersonian(r)
+                L.append('%-22s %-9s %-9s %-9s %-7.3f %-6.1f %-8.4f %.1f  %s'
+                         % ('%s  as measured' % name,
+                            '%03.0f/%02.0f' % r['sigma1'],
+                            '%03.0f/%02.0f' % r['sigma2'],
+                            '%03.0f/%02.0f' % r['sigma3'],
+                            r['phi'], r['ANG_mean'], r['S4'], m, regime))
+            return '\n'.join(L)
         t, p, a = self.rot
         L = ['ROTATION   axis %03.0f / %02.0f   angle %+.1f deg   %s'
              % (t, p, a, rotate.describe(t, p, a)), '']

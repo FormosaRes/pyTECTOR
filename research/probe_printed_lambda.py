@@ -8,8 +8,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))))
-from pytensor import core, invdir, tensorfile
-from pytensor.archive import ROOT, require
+from pytector import core, invdir, tensorfile
+from pytector.archive import ROOT, require
 
 require('probe_printed_lambda.py')
 

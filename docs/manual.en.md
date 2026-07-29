@@ -1,4 +1,4 @@
-# pyTENSOR user manual
+# pyTECTOR user manual
 
 Every control, the full workflows, and the input and output formats.
 The method itself (the criterion, the two runs, λ, equivariance) lives in the
@@ -25,12 +25,18 @@ The method itself (the criterion, the two runs, λ, equivariance) lives in the
 
 ## 1. Install and start
 
-Python 3 with numpy, scipy, matplotlib and PyQt5 (an Anaconda install has all
-of them).
+**One click**: double-click **`install.bat`** in the repository root. It finds
+a Python (Anaconda first), installs the four dependencies (numpy, scipy,
+matplotlib, PyQt5), runs a compile check, and puts a pyTECTOR shortcut on the
+desktop. Safe to run twice.
+
+Manually: Python 3 plus those four packages (an Anaconda install lacks only
+PyQt5), then:
 
 ```
-pyTENSOR.bat        double-click
-python pyTENSOR.py  or from a shell
+pyTECTOR.bat        double-click
+python pyTECTOR.py  or from a shell
+pip install .       also works, and installs a pytector command
 ```
 
 The opening screen (Angelier's Taiwan block diagram) shows for four seconds; a
@@ -41,7 +47,7 @@ window.
 Optional environment variable:
 
 ```
-set PYTENSOR_ARCHIVE=<folder holding the TENSOR run folders>
+set PYTECTOR_ARCHIVE=<folder holding the TENSOR run folders>
 ```
 
 Only the tests and derivation scripts use it; normal operation does not.
@@ -322,11 +328,11 @@ angle filled in.
 | Save PNG (main window) | the current figure at 300 dpi. The export drops the screen titles and adds Angelier's two-line annotation block (S1 S2 S3 / PHI ANG RUP N) |
 | Save PNG (back-tilt window) | the measured + restored pair, annotated the same way |
 | Save HPGL | plotter vectors in **the original program's dialect and coordinates** (scale 2002, origin 2908,3008 — overlays the archive's own HPGL files). Content = the screen drawing code replayed, so everything is in it: striae, ticks, cross, N/M, frame, arrows, reference surfaces |
-| Save INFO1 | the full INFO1 with banner; layout column-identical to the original, readable back by `pytensor.tensorfile` |
+| Save INFO1 | the full INFO1 with banner; layout column-identical to the original, readable back by `pytector.tensorfile` |
 | Save MOHR1 | likewise for MOHR1 |
 
 Note: INFO1/MOHR1 report **the first method with a result** (INVDIR if it was
-ticked). The banner names pyTENSOR rather than claiming to be TENSOR 5.45;
+ticked). The banner names pyTECTOR rather than claiming to be TENSOR 5.45;
 everything machine-read (fixed-width table, the 03 line) keeps the original
 layout.
 
@@ -355,7 +361,7 @@ python demo_fitted.py                   observed vs fitted comparison figure
 The library works without the GUI:
 
 ```python
-from pytensor import read_site, invdir, modern, core
+from pytector import read_site, invdir, modern, core
 site = read_site(r'...\L12\L12')
 r = invdir.run(site.n, site.s, n_pass=2)      # INVDIR
 b = modern.run(site.n, site.s)                # S4MIN

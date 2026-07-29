@@ -21,7 +21,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from . import __version__, retro, splash
 
 CREDIT = """\
-pyTENSOR {ver}
+pyTECTOR {ver}
 
 A Python reconstruction of TENSOR 5.45 (jan91) by Jacques Angelier,
 Tectonique Quantitative, Universite Pierre et Marie Curie, Paris.
@@ -44,7 +44,7 @@ near Yuli as the worked example of applying this method to
 seismological data (1994, fig. 4.44).
 
 Maintainer  Chi-Hsiu Pang
-Repository  github.com/FormosaRes/pyTENSOR
+Repository  github.com/FormosaRes/pyTECTOR
 Licence     not yet chosen; treat as all rights reserved
 
 Requires numpy, scipy, matplotlib, PyQt5.
@@ -223,7 +223,7 @@ Nothing about the inversion changes in 1991 mode.
 class About(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super(About, self).__init__(parent)
-        self.setWindowTitle('About pyTENSOR')
+        self.setWindowTitle('About pyTECTOR')
         self.resize(760, 680)
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(14, 14, 14, 12)

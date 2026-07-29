@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))))
-from pytensor import core, invdir, plot, rotate, tensorfile, tilt
-from pytensor.archive import ROOT, require
+from pytector import core, invdir, plot, rotate, tensorfile, tilt
+from pytector.archive import ROOT, require
 
 require('tilt_test.py')
 

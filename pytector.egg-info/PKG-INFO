@@ -1,3 +1,15 @@
+Metadata-Version: 2.4
+Name: pytector
+Version: 0.3.0
+Summary: Python reconstruction of J. Angelier's TENSOR palaeostress inversion program (TENSOR 5.45, jan91)
+Project-URL: Repository, https://github.com/FormosaRes/pyTECTOR
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: numpy
+Requires-Dist: scipy
+Requires-Dist: matplotlib
+Requires-Dist: PyQt5
+
 # pyTECTOR
 
 A Python reconstruction of Jacques Angelier's **TENSOR** palaeostress inversion

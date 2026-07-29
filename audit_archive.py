@@ -11,7 +11,7 @@ the job.
 
 A gap near zero means the run converged. A large gap means the recorded axes
 and Phi came from a solution that was not at the minimum, so those numbers are
-suspect regardless of what pyTENSOR does.
+suspect regardless of what pyTECTOR does.
 
 Sites flagged by the cheap screen are then re-run properly, adopting the
 LAMBDA that site's own INFO1 records, to see whether the discrepancy is the
@@ -26,8 +26,8 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from pytensor import core, invdir, modern, tensorfile
-from pytensor.archive import ROOT, require
+from pytector import core, invdir, modern, tensorfile
+from pytector.archive import ROOT, require
 
 FLAG_GAP = 0.05          # 5 per cent above the floor is worth a look
 FLAG_AXIS = 10.0         # degrees

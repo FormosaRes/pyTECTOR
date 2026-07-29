@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""pyTENSOR desktop interface.
+"""pyTECTOR desktop interface.
 
-Run it yourself:   pyTENSOR.bat        (or  python pyTENSOR.py)
+Run it yourself:   pyTECTOR.bat        (or  python pyTECTOR.py)
 
 Never launched from an automated shell: a QApplication started there pops a Qt
 platform-plugin error box and exits.
@@ -35,9 +35,9 @@ matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 
-from pytensor import (about, backtilt, core, entry, hpgl, invdir, modern,
+from pytector import (about, backtilt, core, entry, hpgl, invdir, modern,
                       penrec, plot, report, retro, splash, tensorfile)
-from pytensor.ui_style import QSS, MUTED
+from pytector.ui_style import QSS, MUTED
 
 AXES = ('sigma1', 'sigma2', 'sigma3')
 SYM = ('σ₁', 'σ₂', 'σ₃')
@@ -174,7 +174,7 @@ class EntryRow(QtWidgets.QWidget):
         try:
             rec = entry.parse_record(*vals)
         except entry.RecordError as exc:
-            QtWidgets.QMessageBox.warning(self, 'pyTENSOR', str(exc))
+            QtWidgets.QMessageBox.warning(self, 'pyTECTOR', str(exc))
             return
         self.submitted.emit(rec)
         for e in self.fields:
@@ -313,7 +313,7 @@ class ResultStrip(Panel):
 class Main(QtWidgets.QMainWindow):
     def __init__(self):
         super(Main, self).__init__()
-        self.setWindowTitle('pyTENSOR')
+        self.setWindowTitle('pyTECTOR')
         self.resize(1500, 950)
         self.records = []
         self.results = {}
@@ -656,7 +656,7 @@ class Main(QtWidgets.QMainWindow):
                 dipaz, dip = (trend + 180.0) % 360.0, 90.0 - plunge
                 a, b = trend, plunge
         except (entry.RecordError, ValueError) as exc:
-            QtWidgets.QMessageBox.warning(self, 'pyTENSOR', str(exc))
+            QtWidgets.QMessageBox.warning(self, 'pyTECTOR', str(exc))
             return
 
         self.planes.append(dict(kind=kind, a=a, b=b, dipaz=dipaz, dip=dip,
@@ -866,7 +866,7 @@ class Main(QtWidgets.QMainWindow):
         found = tensorfile.discover(d)
         if not found:
             QtWidgets.QMessageBox.information(
-                self, 'pyTENSOR', 'No TENSOR runs found under that folder.')
+                self, 'pyTECTOR', 'No TENSOR runs found under that folder.')
             return
         dlg = QtWidgets.QDialog(self)
         dlg.setWindowTitle('%d runs found' % len(found))
@@ -897,7 +897,7 @@ class Main(QtWidgets.QMainWindow):
         try:
             site = tensorfile.read_site(path)
         except Exception as exc:
-            QtWidgets.QMessageBox.warning(self, 'pyTENSOR', str(exc))
+            QtWidgets.QMessageBox.warning(self, 'pyTECTOR', str(exc))
             return
         self.records = [dict(r) for r in site.records]
         self.site_name = site.name
@@ -931,7 +931,7 @@ class Main(QtWidgets.QMainWindow):
     def invert(self):
         if len(self.active) < 4:
             QtWidgets.QMessageBox.information(
-                self, 'pyTENSOR',
+                self, 'pyTECTOR',
                 'Four fault slips are the minimum: the reduced stress tensor '
                 'has four unknowns.')
             return
@@ -953,7 +953,7 @@ class Main(QtWidgets.QMainWindow):
         self.btn_run.setEnabled(True)
         self.progress.hide()
         self.status.showMessage('failed')
-        QtWidgets.QMessageBox.critical(self, 'pyTENSOR', msg)
+        QtWidgets.QMessageBox.critical(self, 'pyTECTOR', msg)
 
     def _finished(self, out):
         self.btn_run.setEnabled(True)
@@ -1159,7 +1159,7 @@ class Main(QtWidgets.QMainWindow):
         r, kw = self._info_kwargs()
         if r is None:
             QtWidgets.QMessageBox.information(
-                self, 'pyTENSOR', 'Run the inversion first.')
+                self, 'pyTECTOR', 'Run the inversion first.')
             return
         fn, _ = QtWidgets.QFileDialog.getSaveFileName(
             self, 'Save ' + which, which, 'All files (*)')
@@ -1190,7 +1190,7 @@ class Main(QtWidgets.QMainWindow):
         self.retro = (not getattr(self, 'retro', False)) if on is None else on
         app = QtWidgets.QApplication.instance()
         app.setStyleSheet(retro.QSS if self.retro else QSS)
-        self.setWindowTitle(retro.TITLE if self.retro else 'pyTENSOR')
+        self.setWindowTitle(retro.TITLE if self.retro else 'pyTECTOR')
 
         # phosphor green on black, and hard aliased edges so the lines read as
         # pixels rather than as smooth strokes

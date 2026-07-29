@@ -10,7 +10,7 @@ import csv
 
 import numpy as np
 
-rows = list(csv.DictReader(open('pytensor_AB_comparison.csv',
+rows = list(csv.DictReader(open('pytector_AB_comparison.csv',
                                 encoding='utf-8-sig')))
 rows = [r for r in rows if int(r['n']) >= 10]
 phi = np.array([float(r['A_phi']) for r in rows])

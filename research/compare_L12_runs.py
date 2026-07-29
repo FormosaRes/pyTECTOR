@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Is pyTENSOR's L12 answer wrong, or just a different point on a flat surface?
+"""Is pyTECTOR's L12 answer wrong, or just a different point on a flat surface?
 
 The test is not "do the numbers match" but "which solution sits lower on the
 criterion both programs claim to minimise". If ours is lower or equal, ours is
@@ -13,8 +13,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))))
-from pytensor import core, invdir, tensorfile
-from pytensor.archive import ROOT, require
+from pytector import core, invdir, tensorfile
+from pytector.archive import ROOT, require
 
 require('compare_L12_runs.py')
 d = os.path.join(ROOT, 'L12')
@@ -34,12 +34,12 @@ T_new = r['T']
 
 print('S4, the quantity both programs minimise (lower is a better fit)')
 print('   TENSOR 5.45 : %.6f' % core.S4(T_old, n, s))
-print('   pyTENSOR    : %.6f' % core.S4(T_new, n, s))
+print('   pyTECTOR    : %.6f' % core.S4(T_new, n, s))
 print()
 
 a = core.summary(T_old, n, s)
 b = core.summary(T_new, n, s)
-print('%-14s %-18s %-18s %s' % ('', 'TENSOR 5.45', 'pyTENSOR', 'difference'))
+print('%-14s %-18s %-18s %s' % ('', 'TENSOR 5.45', 'pyTECTOR', 'difference'))
 for k, nm in (('sigma1', 'sigma1'), ('sigma2', 'sigma2'), ('sigma3', 'sigma3')):
     va = core.vec_from_trend_plunge(*a[k])
     vb = core.vec_from_trend_plunge(*b[k])

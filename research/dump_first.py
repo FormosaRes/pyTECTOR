@@ -8,9 +8,9 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))))
-from pytensor import hpgl
+from pytector import hpgl
 
-from pytensor.archive import ROOT
+from pytector.archive import ROOT
 def fit_circle(P):
     x, y = P[:, 0], P[:, 1]
     A = np.column_stack([x, y, np.ones(len(x))])

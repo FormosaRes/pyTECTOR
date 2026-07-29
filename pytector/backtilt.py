@@ -102,7 +102,7 @@ class BackTiltWindow(QtWidgets.QDialog):
 
     def __init__(self, parent=None):
         super(BackTiltWindow, self).__init__(parent)
-        self.setWindowTitle('pyTENSOR  -  back-tilt')
+        self.setWindowTitle('pyTECTOR  -  back-tilt')
         self.setWindowFlags(self.windowFlags()
                             | QtCore.Qt.WindowMinMaxButtonsHint)
         self.resize(1240, 900)
@@ -367,7 +367,7 @@ class BackTiltWindow(QtWidgets.QDialog):
     def _failed(self, msg):
         self.btn_run.setEnabled(True)
         self.progress.hide()
-        QtWidgets.QMessageBox.critical(self, 'pyTENSOR', msg)
+        QtWidgets.QMessageBox.critical(self, 'pyTECTOR', msg)
 
     def _finished(self, out):
         self.btn_run.setEnabled(True)

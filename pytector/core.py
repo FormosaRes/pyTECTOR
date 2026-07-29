@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""pyTENSOR core: geometry, the Angelier criterion, and the quality estimators.
+"""pyTECTOR core: geometry, the Angelier criterion, and the quality estimators.
 
 Every formula carries its source. Primary reference:
 

@@ -1,0 +1,2 @@
+[gui_scripts]
+pytector = pyTECTOR:main

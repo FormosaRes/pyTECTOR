@@ -11,9 +11,9 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))))
-from pytensor import tensorfile
+from pytector import tensorfile
 
-from pytensor.archive import ROOT
+from pytector.archive import ROOT
 PAT = re.compile(r'\(backtilted\s*([0-9]{1,3})\s*([+-]?\d+)\s*\)', re.I)
 
 

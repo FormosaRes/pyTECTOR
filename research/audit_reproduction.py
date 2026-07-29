@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""The right question: which archive runs does pyTENSOR fail to reproduce?
+"""The right question: which archive runs does pyTECTOR fail to reproduce?
 
 An earlier screen ranked sites by S4(recorded) / S4(global minimum). That was a
 bad metric: with four faults and four unknowns the global minimum can be driven
@@ -8,7 +8,7 @@ It measures sample size, not whether the old run converged.
 
 What matters is simpler. Re-run each site the way the original did, adopting
 the LAMBDA its own INFO1 records, and ask how far the answer moves. Small
-movement means pyTENSOR reproduces that run and the recorded numbers stand.
+movement means pyTECTOR reproduces that run and the recorded numbers stand.
 Large movement is worth investigating.
 """
 import csv
@@ -19,8 +19,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))))
-from pytensor import core, invdir, tensorfile
-from pytensor.archive import ROOT, require
+from pytector import core, invdir, tensorfile
+from pytector.archive import ROOT, require
 
 
 def main(out_csv):
@@ -89,7 +89,7 @@ def main(out_csv):
                  100.0 * (d1 <= thr).sum() / len(d1)))
 
     bad = [r for r in rows if r['s1'] > 5.0]
-    print('\n%d runs pyTENSOR does NOT reproduce within 5 deg' % len(bad))
+    print('\n%d runs pyTECTOR does NOT reproduce within 5 deg' % len(bad))
     if bad:
         print('%-46s %3s %4s %6s %7s %8s %8s'
               % ('site', 'n', 'NO', 'sig1', 'dPhi', 'S4 rec', 'S4 new'))

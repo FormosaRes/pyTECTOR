@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from catalogue_striae import symbols_of, ROOT
-from pytensor import core
+from pytector import core
 
 samples = []
 for folder in sorted(os.listdir(ROOT)):
@@ -45,8 +45,8 @@ def strike_component(x):
 
 
 # rebuild the 3-D slip for each sample from its record
-from pytensor.core import normal_from_dipaz, slip_from_rake
-from pytensor.tensorfile import RAKE_OFFSET
+from pytector.core import normal_from_dipaz, slip_from_rake
+from pytector.tensorfile import RAKE_OFFSET
 
 rules = {'strike-slip component': [],
          'stored rake vs 90 deg': [],

@@ -2,7 +2,7 @@
 """Two oracles for the entry parser.
 
 1. The archive's own human-readable tails, typed back in: the parser must
-   recover the rake TENSOR stored in columns [7:10]. Needs PYTENSOR_ARCHIVE.
+   recover the rake TENSOR stored in columns [7:10]. Needs PYTECTOR_ARCHIVE.
 
 2. The original program itself. On 2026-07-29 the user ran MESURE 5.51 (aou91)
    on the Windows XP machine, typed three records, and photographed the echo,
@@ -27,9 +27,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
 
-from pytensor import core, entry, tensorfile
+from pytector import core, entry, tensorfile
 
-from pytensor.archive import ROOT
+from pytector.archive import ROOT
 SITES = [('L12', os.path.join(ROOT, 'L12', 'L12')),
          ('0406-7', os.path.join(ROOT, '0406-7', '0406-04'))]
 

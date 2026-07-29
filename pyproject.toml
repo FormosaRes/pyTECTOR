@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pytector"
+version = "0.3.0"
+description = "Python reconstruction of J. Angelier's TENSOR palaeostress inversion program (TENSOR 5.45, jan91)"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "PyQt5",
+]
+
+[project.urls]
+Repository = "https://github.com/FormosaRes/pyTECTOR"
+
+# pip install . && pytector  starts the desktop interface
+[project.gui-scripts]
+pytector = "pyTECTOR:main"
+
+[tool.setuptools]
+packages = ["pytector"]
+py-modules = ["pyTECTOR"]

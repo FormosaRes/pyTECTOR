@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Side by side: the original TENSOR HPGL against pyTENSOR's rendering of the
+"""Side by side: the original TENSOR HPGL against pyTECTOR's rendering of the
 same site with the same solution. This is the acceptance test for the drawing
 style."""
 import os
@@ -12,9 +12,9 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))))
-from pytensor import core, hpgl, plot, tensorfile
+from pytector import core, hpgl, plot, tensorfile
 
-from pytensor.archive import ROOT
+from pytector.archive import ROOT
 SITES = [('L12', 'L12', 'L12', 5.0), ('0406-7', '0406-04', '0406-7', 6.9)]
 
 fig, axes = plt.subplots(2, len(SITES), figsize=(12.5, 12.6))
@@ -41,9 +41,9 @@ for col, (folder, datafile, label, decl) in enumerate(SITES):
     ax = axes[1][col]
     plot.plot_site(ax, site.n, site.s, res, certainty=site.confidence,
                    sides=site.sides, declination=decl,
-                   site_code='01', header=label, program='pyTENSOR')
+                   site_code='01', header=label, program='pyTECTOR')
     plot.annotate_result(ax, res, n_data=len(site))
-    ax.set_title('%s   pyTENSOR, same tensor' % label, fontsize=10)
+    ax.set_title('%s   pyTECTOR, same tensor' % label, fontsize=10)
 
 out = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'style_check.png')
 fig.savefig(out, dpi=135, bbox_inches='tight', facecolor='white')

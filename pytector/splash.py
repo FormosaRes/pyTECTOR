@@ -70,7 +70,7 @@ class Splash(QtWidgets.QDialog):
         fl = QtWidgets.QVBoxLayout(foot)
         fl.setContentsMargins(16, 8, 16, 12)
         fl.setSpacing(2)
-        t = QtWidgets.QLabel('pyTENSOR')
+        t = QtWidgets.QLabel('pyTECTOR')
         t.setStyleSheet('font-size: 19px; font-weight: 600; color: #1E1E1C;')
         fl.addWidget(t)
         s = QtWidgets.QLabel(

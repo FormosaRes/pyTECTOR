@@ -9,7 +9,7 @@ Angelier 古應力反演程式 **TENSOR 5.45（1991 年 1 月版）** 的 Python
 
 Named in tribute to the original. 名稱致敬原程式。
 
-**[English](#english)**　｜　**[中文](#中文)**
+**[English](#english)**　｜　**[中文](#中文)**　｜　**User manual: [English](docs/manual.en.md) · [中文](docs/manual.zh.md)**
 
 ---
 
@@ -58,7 +58,8 @@ python demo_report.py [site file]      invert an old site, print INFO1 + MOHR1
 python run_batch.py [root] [out.csv]   both runs over a whole folder tree
 ```
 
-Requires numpy, scipy, matplotlib, PyQt5.
+Requires numpy, scipy, matplotlib, PyQt5. The full interface walkthrough,
+control by control, is in **[docs/manual.en.md](docs/manual.en.md)**.
 
 Type a fault in four fields and watch it land on the stereogram:
 
@@ -174,23 +175,95 @@ and no adjustment loop is needed; the search is global. It reaches a lower S₄ 
 So the original program does not reach the minimum of its own criterion, because
 λ stops before it converges.
 
-### λ does not converge, and stopping early is the point
+### What λ is, in Angelier's own words
 
-`λ_next` = the taumax of the solution found at `λ`. That is a fixed-point
-iteration, and nothing guarantees it has a fixed point. On **72 of the 92
-archive sites it runs away.** Site 0406-7 is one of them: left to run, λ goes
-0.866 → 1.009 → 1.115 → … → 1.1 × 10⁹ by pass 200, and S₄ degrades from 4 per
-cent above the minimum to 78 per cent above it. On L12 it does settle, at
-λ = 2.2404, reaching 1.5 per cent above the minimum.
+None of this is reverse-engineered. Angelier sets it out in Section 4 and
+Appendix IV of the 1990 paper, and it is worth reading before drawing any
+conclusion from the difference between the two runs.
 
-The mechanism is a positive feedback. A larger λ asks the solver to match a
-larger shear magnitude, it obliges by inflating the unnormalised tensor, and the
-inflated tensor has a larger taumax, which becomes the next λ.
+λ is the **largest shear stress the tensor can produce**. The criterion wants
+the predicted shear to point along the observed slip *and* to be large enough to
+overcome friction, so λ is the magnitude it is aiming at.
 
-So `(NO k)` being a **user-chosen pass count** rather than "iterate to
-convergence" is not a shortcut in the original program. On most sites it is the
-only thing keeping the answer finite. The archive bears that out: NO 1 on 62
-sites, NO 2 on 25, and 3 to 5 on the remaining five.
+For the normalised A16 tensor that is a constant. For the equation (14) tensor
+it is not, and Angelier says why: the diagonal terms carry ψ while the
+off-diagonal terms do not, so turning the axes changes the magnitude of the
+stress. His summary is that "rotation of axes and magnitude of stress are not
+analytically independent" (1990, Section 4), and that without this the parameter
+would simply be a constant and no adjustment would be needed.
+
+His fix is the iteration: run the determination a few times, each pass taking λ
+to be the largest shear of the previous pass. That is exactly what `(NO k)`
+counts.
+
+**Angelier also says plainly that the A16 form would be better**, that it would
+make the λ adjustment unnecessary and leave λ constant at √3/2, and that he did
+not use it because he could not solve that formulation analytically, while
+noting there is no reason to think it impossible (Appendix IV). PSIDIR, the
+final step, is the A16 form used once at the end, and he describes it as added
+for safety against the artificial σ₁/σ₃ permutations that the unnormalised form
+produces on poorly varied data.
+
+So **S4MIN is not a modernisation of Angelier's method. It is the formulation he
+described and wanted**, reached numerically because the analytical route he
+needed in 1990 was closed. The gap between the two runs is the cost of that
+1990 constraint, not a disagreement about geology.
+
+### The iteration does not converge, and stopping early is the point
+
+Angelier says "few successive determinations". He does not say how many, and he
+does not claim convergence. Checking that against the archive: **the iteration
+runs away on 72 of the 92 sites.** Site 0406-7 is one, left to run λ goes
+0.866 → 1.009 → 1.115 → … → 1.1 × 10⁹ by pass 200, with S₄ degrading from 4 per
+cent above the minimum to 78 per cent. On L12 it does settle, at λ = 2.2404 and
+1.5 per cent above the minimum.
+
+The mechanism is positive feedback: a larger λ asks the solver to match a larger
+shear, it obliges by inflating the unnormalised tensor, and the inflated tensor
+has a larger taumax, which becomes the next λ.
+
+So a **user-chosen pass count** rather than "iterate to convergence" is not a
+shortcut. On most sites it is what keeps the answer finite. The archive bears
+that out: NO 1 on 62 sites, NO 2 on 25, and 3 to 5 on the remaining five.
+
+### Reading convergence off an INFO1
+
+INFO1 prints three numbers, and it is easy to read the wrong one:
+
+```
+SOLUTION INVDIR (NO 1)  LAMBDA= 0.68     <- the lambda INVDIR actually used
+SOLUTION PSIDIR         AXES OK !
+LAMBDA= 0.87            TAUMAX= 0.80     <- PSIDIR: lambda is sqrt(3)/2 by
+                                            construction, so it is 0.87 in
+                                            every file ever written
+```
+
+`TAUMAX` is not √3/2 either. For a normalised tensor with eigenvalues
+cos(ψ + k·2π/3) the largest shear is
+
+```
+taumax = 3 / (4 sqrt(Phi^2 - Phi + 1))
+```
+
+which runs from 0.75 at Φ = 0 or 1 up to √3/2 = 0.866 at Φ = 0.5. That matches
+the printed TAUMAX to within 0.005 on 87 archive runs, which is a useful check
+that the whole picture is right.
+
+**The adjustment has converged when the first number has climbed to meet the
+third.** Across the 88 archive runs with both numbers, the median gap is 0.160
+and none of them is inside 0.02:
+
+| TAUMAX − LAMBDA | sites |
+|---|---|
+| ≤ 0.02, converged | 0 |
+| 0.02 to 0.05 | 4 |
+| 0.05 to 0.15 | 31 |
+| over 0.15 | 53 |
+
+That is not a criticism of how the runs were made. Given that the iteration
+diverges on most sites, stopping at NO 1 or NO 2 was the right thing to do. It
+does mean the recorded λ is a stopping point rather than a solution, which is
+what **archive LAMBDA** exists to reproduce.
 
 This also means the INVDIR-to-S4MIN gap is not one number. It depends on the
 site and on the pass count that was used:
@@ -582,6 +655,7 @@ python run_batch.py [根目錄] [out.csv] 對整棵資料夾跑兩種方法
 ```
 
 需要 numpy、scipy、matplotlib、PyQt5。
+逐一功能的完整操作說明在 **[docs/manual.zh.md](docs/manual.zh.md)**。
 
 輸入是四欄，打完就看到它落在投影網上：
 
@@ -636,20 +710,74 @@ CS - 122 - 87W - 124
 （L12 0.2360 對 0.3018；0406-7 7.3201 對 7.6198）。
 也就是說，原程式並沒有走到它自己準則的最小值，因為 λ 停在未收斂處。
 
-### ⚠️ λ 迭代不會收斂，而「提早停」正是重點
+### λ 是什麼：Angelier 自己的說法
 
-`λ_next` ＝ 在當前 λ 求得的那個解的 taumax。這是一個不動點迭代，
-而沒有任何東西保證它有不動點。**92 站裡有 72 站會發散。**
-0406-7 就是其中之一：放它一直跑，λ 從 0.866 → 1.009 → 1.115 → … 到第 200 趟變成 1.1 × 10⁹，
-S₄ 從高於最小值 4 % 惡化到高於 78 %。L12 則會收斂，停在 λ = 2.2404，最終高於最小值 1.5 %。
+以下都不是逆向工程猜的，是他 1990 年論文 Section 4 與 Appendix IV 白紙黑字寫的。
 
-機制是正回饋：λ 變大就是要求解出更大的剪應力，
-求解器照辦的方式是把那個沒有正規化的張量撐大，
-撐大的張量 taumax 又更大，於是變成下一輪的 λ。
+λ 是**這個張量能產生的最大剪應力**。準則同時要求預測剪應力方向對上實測滑動、
+大小又要大到足以克服摩擦，λ 就是它瞄準的那個大小。
 
-所以 `(NO k)` 是**使用者選的趟數**、而不是「迭代到收斂」，在原程式裡不是偷懶。
-在多數站上，那是唯一能讓答案不爆掉的做法。archive 也印證了這件事：
-62 站跑 NO 1、25 站 NO 2、剩下五站是 3 到 5。
+正規化的 A16 張量的最大剪應力是常數；式 (14) 的張量不是。原因他講得很白：
+對角線帶著 ψ、非對角線不帶，所以**轉動應力軸會改變應力大小**。
+他的總結是「軸的旋轉與應力大小在解析上不獨立」（1990, Section 4），
+並說如果不是這樣，λ 就只是個常數、根本不需要調整。
+
+他的補救就是那個迭代：跑個幾趟，每趟把 λ 換成前一趟解的最大剪應力。`(NO k)` 數的就是這個。
+
+**Angelier 也明講 A16 那個形式比較好**：那樣 λ 的調整整個不需要、λ 恆等於 √3/2；
+他沒用是因為那個式子他解析解不出來，同時註明「沒有理由認為不可能」（Appendix IV）。
+PSIDIR 這最後一步，就是把 A16 形式在收尾用一次，他自己說是「為了安全加上的」，
+用來修未正規化形式在資料方位變化太少時會產生的 σ₁/σ₃ 人為對調。
+
+所以 **S4MIN 不是把 Angelier 的方法「現代化」，而是他描述過、想要但當年做不出來的那個形式**，
+只是改用數值方法走到。兩種跑法的差距是 1990 年那個限制的代價，不是地質上的分歧。
+
+### λ 迭代不會收斂，而「提早停」正是重點
+
+Angelier 只說「幾趟連續的決定」，沒說幾趟，也沒宣稱收斂。拿 archive 驗證：
+**92 站裡有 72 站會發散。** 0406-7 就是其中之一：放它一直跑，
+λ 從 0.866 → 1.009 → 1.115 → … 到第 200 趟變成 1.1 × 10⁹，
+S₄ 從高於最小值 4 % 惡化到 78 %。L12 則會收斂，停在 λ = 2.2404、高於最小值 1.5 %。
+
+機制是正回饋：λ 變大就是要求更大的剪應力，
+求解器照辦的方式是把沒正規化的張量撐大，撐大的張量最大剪應力又更大，變成下一輪的 λ。
+
+所以**使用者自選趟數**而不是「迭代到收斂」，不是偷懶；在多數站上那是唯一讓答案不爆掉的做法。
+archive 印證：62 站 NO 1、25 站 NO 2、五站 3 到 5。
+
+### 從 INFO1 直接讀收斂程度
+
+INFO1 印三個數字，很容易讀錯一個：
+
+```
+SOLUTION INVDIR (NO 1)  LAMBDA= 0.68     <- INVDIR 實際用的 λ
+SOLUTION PSIDIR         AXES OK !
+LAMBDA= 0.87            TAUMAX= 0.80     <- PSIDIR：λ 天生就是 √3/2，
+                                            所以每一個檔案都印 0.87
+```
+
+`TAUMAX` 也不是 √3/2。特徵值為 cos(ψ + k·2π/3) 的正規化張量，最大剪應力是
+
+```
+taumax = 3 / (4·√(Φ² − Φ + 1))
+```
+
+從 Φ = 0 或 1 時的 0.75 到 Φ = 0.5 時的 0.866。87 個 archive run 對到 0.005 以內，
+這也順便驗證了整個理解沒有錯。
+
+**第一個數字爬到跟第三個數字一樣，才是收斂。** 88 個有這兩個數字的 run，
+中位差距 0.160，沒有任何一個在 0.02 以內：
+
+| TAUMAX − LAMBDA | 站數 |
+|---|---|
+| ≤ 0.02（收斂） | 0 |
+| 0.02 到 0.05 | 4 |
+| 0.05 到 0.15 | 31 |
+| 超過 0.15 | 53 |
+
+這不是在批評當年的跑法：迭代在多數站上會發散，停在 NO 1、NO 2 是對的。
+它的意思是**記錄下來的 λ 是一個停止點、不是一個解**，
+而 **archive LAMBDA** 這個功能存在的目的就是重現那個停止點。
 
 這也表示 INVDIR 與 S4MIN 的差距**不是一個固定數字**，它取決於站別與當年用的趟數：
 

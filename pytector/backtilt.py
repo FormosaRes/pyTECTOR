@@ -274,6 +274,32 @@ class BackTiltWindow(QtWidgets.QDialog):
         self.progress.hide()
         lay.addWidget(self.progress)
 
+        # The rotated data themselves. The window was showing what the rotation
+        # did to the ANSWER and never what it did to the DATA, so the numbers
+        # that would go back into TENSOR were nowhere on screen.
+        left = QtWidgets.QFrame()
+        left.setObjectName('panel')
+        lv = QtWidgets.QVBoxLayout(left)
+        lv.setContentsMargins(8, 6, 8, 8)
+        lv.setSpacing(4)
+        lab = QtWidgets.QLabel('BACK-TILTED DATA')
+        lab.setObjectName('heading')
+        lv.addWidget(lab)
+        self.lbl_data = QtWidgets.QLabel('')
+        self.lbl_data.setObjectName('legend')
+        self.lbl_data.setWordWrap(True)
+        lv.addWidget(self.lbl_data)
+        self.txt_data = QtWidgets.QPlainTextEdit()
+        self.txt_data.setReadOnly(True)
+        self.txt_data.setObjectName('report')
+        self.txt_data.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
+        lv.addWidget(self.txt_data, 1)
+        b = QtWidgets.QPushButton('Copy')
+        b.setToolTip('Copy the back-tilted records to the clipboard, in the '
+                     'four-field entry format, ready to paste into a new site.')
+        b.clicked.connect(self._copy_data)
+        lv.addWidget(b)
+
         self.fig = Figure(figsize=(11, 5.6), facecolor='white')
         self.canvas = Canvas(self.fig)
         self.canvas.mpl_connect('resize_event', self._on_resize)
@@ -282,14 +308,27 @@ class BackTiltWindow(QtWidgets.QDialog):
         hv = QtWidgets.QVBoxLayout(holder)
         hv.setContentsMargins(4, 4, 4, 4)
         hv.addWidget(self.canvas)
-        lay.addWidget(holder, 1)
 
         self.txt = QtWidgets.QPlainTextEdit()
         self.txt.setReadOnly(True)
         self.txt.setObjectName('report')
         self.txt.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
         self.txt.setFixedHeight(168)
-        lay.addWidget(self.txt)
+
+        right = QtWidgets.QWidget()
+        rv = QtWidgets.QVBoxLayout(right)
+        rv.setContentsMargins(0, 0, 0, 0)
+        rv.setSpacing(6)
+        rv.addWidget(holder, 1)
+        rv.addWidget(self.txt)
+
+        split = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
+        split.setChildrenCollapsible(False)
+        split.addWidget(left)
+        split.addWidget(right)
+        split.setStretchFactor(1, 1)
+        split.setSizes([300, 940])
+        lay.addWidget(split, 1)
 
     # -------------------------------------------------------------- data --
     def reload(self):
@@ -482,6 +521,7 @@ class BackTiltWindow(QtWidgets.QDialog):
         # that is what makes dragging cheap enough to do live
         self.results = dict((k, v) for k, v in self.results.items()
                             if k.startswith('raw_'))
+        self._fill_data()
         self._draw()
         if live and ok and self.cb_live.isChecked():
             self._timer.start()
@@ -801,6 +841,51 @@ class BackTiltWindow(QtWidgets.QDialog):
         # after the layout, because it measures the panels
         plot.fit_captions(self.fig)
         self.canvas.draw()
+
+    def rotated_records(self):
+        """The data as they are after the rotation, as dip azimuth / dip /
+        rake, which is the form they go back into TENSOR in."""
+        n, s = self.n_s
+        if not len(n) or not self.rot:
+            return []
+        rn, rs = rotate.rotate_site(n, s, *self.rot)
+        return rotate.as_records(rn, rs)
+
+    def _fill_data(self):
+        """Measured beside back-tilted, one line per fault."""
+        recs = self.rotated_records()
+        if not recs:
+            self.txt_data.setPlainText('')
+            self.lbl_data.setText('set a rotation to see the data it produces')
+            return
+        L = ['%-3s %-4s %-12s   %-12s' % ('n', 'code', 'as measured',
+                                          'back-tilted'),
+             '%-3s %-4s %-12s   %-12s' % ('', '', 'az / dip / rake',
+                                          'az / dip / rake')]
+        for i, (a, b) in enumerate(zip(self.records, recs)):
+            code = '%s%s' % (a.get('confidence', 'C') or 'C',
+                             a.get('sense', '') or '')
+            L.append('%-3d %-4s %03d /%02d /%03d   %03d /%02d /%03d'
+                     % (i + 1, code[:4], a['dipaz'], a['dip'],
+                        round(a['rake']), b['dipaz'], b['dip'],
+                        round(b['rake'])))
+        self.txt_data.setPlainText('\n'.join(L))
+        self.lbl_data.setText(
+            'rake is stored with Angelier’s +180 convention, the same as '
+            'in the site file. %s' % rotate.describe(*self.rot))
+
+    def _copy_data(self):
+        recs = self.rotated_records()
+        if not recs:
+            return
+        out = []
+        for a, b in zip(self.records, recs):
+            out.append('%s%s %03d %02d %03d'
+                       % (a.get('confidence', 'C') or 'C',
+                          a.get('sense', '') or '', b['dipaz'], b['dip'],
+                          round(b['rake'])))
+        QtWidgets.QApplication.clipboard().setText('\n'.join(out))
+        self.lbl_data.setText('%d records copied.' % len(out))
 
     def _on_resize(self, _ev):
         """The captions are sized to the panel, so they have to be resized

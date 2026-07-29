@@ -16,3 +16,4 @@ demo_*.txt
 *.egg-info/
 build/
 dist/
+*.rar

@@ -109,6 +109,16 @@ The confidence sets the striae arrowhead on the plot (C full head, P one barb,
 S none). The movement letter is a note; the actual slip direction comes from
 field 4.
 
+These are the striated-fault codes of MESURE's own system, which is larger:
+index 1 may also be `*` (striae, unknown sense), `F` (fault without
+slickensides), `J` (joints and bedding), `M` (metamorphic planes), `L`
+(lineations) or `A` (fold axes), each with its own second-letter table, and
+the original warns that vertical striae take the letter of the downgoing
+side and horizontal faults the motion of the lower block. pyTECTOR reads
+the striated-fault records; the full table, recovered from the program's
+embedded HELP text, is in
+[mesure_oracle.md](mesure_oracle.md#mesures-own-help-the-complete-structure-code-system).
+
 **Field 3**: dip + the dip's quadrant. `87W` means dipping 87° to the west.
 The program resolves the true dip azimuth from the quadrant letter, so a
 strike of `122` or `302` both work.

@@ -212,6 +212,127 @@ mean RUP 16.1, n = 5.
   programs named: DIEDRE (P-T dihedra), CONJUG (conjugate systems), and the
   post-processors ANATEN, TRIAGE, DIMOHR.
 
+# The programs themselves: the 2008 workshop binaries (2026-07-29)
+
+A RAR from a 2008-04-09 workshop distribution turned up with the complete
+suite: `Mesure.exe`, `Tensor.exe`, `Diagra.exe`, `Dessin.exe`, `Vision.exe`,
+`Tra.exe`, `Traduc.exe`. All are 16-bit DOS executables; the four big ones
+are compiled Fortran with every dialogue text intact as FORMAT strings, so
+the full embedded text could be extracted and read. The banners match the
+XP machine exactly: MESURE 5.51 (aou91), TENSOR 5.45 (jan91), DIAGRA 5.39
+(aou91). These are the very programs that produced the archive and the
+fixture. (The binaries are not redistributable and are not committed; this
+page records what they contain.)
+
+## The drawing pipeline
+
+- **DIAGRA** computes the diagram and writes a plot file in **CALCOMP**
+  format (the fixture's `PLOT1`).
+- **VISION** (Turbo Pascal, Turbo Graphix, French-only menus) reads a
+  CALCOMP plot file — its default file name is literally `plot1` — and
+  draws it on the screen: `Dessin de l'ensemble --> A`, `Dessin d'un
+  diagramme --> [1-12]`.
+- **TRADUC** translates CALCOMP to HPGL ("TRANSFER DES FICHERS
+  (Calcomp --> HpLaser)"); its output contains the `PD;PA`, `PU;PA`,
+  `DI 1,0;SI` commands we measured. **TRA** (Turbo C) is its batch
+  front-end, spawning `traduc` and renaming the output `hpgl`.
+
+So screen picture and HPGL plot are two renderings of the same CALCOMP
+file, drawn once by DIAGRA. That is why the photograph of the VISION screen
+agrees with the fixture HPGL element for element (next section).
+
+## MESURE's own HELP: the complete structure-code system
+
+The `?` help embedded in Mesure.exe gives the authoritative code table,
+bilingual. A measurement is `(2A1,1X,I3,2(1X,I2,A1))`: two index letters,
+strike, dip+quadrant, then optionally rake+quadrant or a bare azimuth
+(000 forbidden).
+
+**Index 1** (what the structure is):
+
+| code | meaning |
+|---|---|
+| C | striated fault, sure sense |
+| P | striated fault, probable sense |
+| S | striated fault, supposed sense |
+| * | striated fault, unknown sense ("no use for tensors") |
+| F | fault without slickensides |
+| J | any joint (fracture, gash, bedding) |
+| M | metamorphic plane, with or without lineation |
+| L | any single lineation |
+| A | any axis (fold axis) |
+
+**Index 2 for C, P, S faults**: N normal, I inverse/reverse, D dextral,
+S sinistral — with two special cases spelled out by the program itself:
+vertical striae take the letter of the **downgoing side** (N, E, W, S), and
+a horizontal fault takes the **motion of the lower block** (N, E, W, S).
+
+**Index 2 for J**: blank simple fracture; O, S, X, F, V tension gashes
+(open / sediment-filled / mineralized / fibrous / dike); P stylolitic
+peaks; N, I, * bedding (normal / overturned / undefined).
+
+**Index 2 for M**: blank undefined, S schistosity, F mineral foliation,
+M mylonitic, C cleavage; an index 3 (T, C, E, X, M) defines a lineation
+borne on the plane.
+
+**Index 2 for L**: blank undefined, F mineral fiber, P stylolite peak or
+impact axis, T intersection, C crenulation, E extension, X mineral,
+M mylonitic.
+
+**Index 2 for A**: blank undefined, A anticline, S syncline.
+
+**Input mode Z** (index 2 = Z) uses a signed rake instead: 0 to 180 for a
+reverse fault (1-89 reverse-dextral, 91-179 reverse-sinistral), 0 to -180
+for a normal fault. A third index letter marks double measurements (a plane
+parallel to bedding, or a metamorphic plane with its lineation).
+
+## The CONT. line decoded
+
+The continuation prompt's default string `1CCC0C0T  0.000` is nine fields,
+which the help enumerates:
+
+| field | default | meaning |
+|---|---|---|
+| 1 | `1` | weight, 1-9 |
+| 2-4 | `CCC` | error grades on strike, dip, rake/azimuth: A-E from excellent to bad, C average |
+| 5 | `0` | chronological order (tectonic event), 1-9, 0 undefined |
+| 6 | `C` | certainty of that order: C certain, P probable, S inferred |
+| 7 | `0` | association index: rank within a sequence of associated measurements |
+| 8 | `T` | type of separation: blank null, `-` as before, T total, L lateral, F dip-slip, V vertical |
+| 9 | `0.000` | value of that separation component, metres |
+
+plus a free comment. This is the tail our reader carries through unparsed.
+
+## TENSOR's embedded text
+
+The method help photographed on the XP machine is recovered verbatim, in
+both languages (the French version cites the GJI paper as "J. Angelier
+(1990)"; the English as 1988, its in-press year). Beyond what the
+photographs showed, the strings hold the rest of the special-mode dialogue:
+
+- search-grid menu for the iterative methods: `X` choice of each parameter
+  ("difficult !"), `S` special autofocus grid, `B` mean grid rather mobile,
+  `P` small mobile grid, `F` very small and mobile grid;
+- selection of up to 5 tectonic events per run;
+- lower and upper bounds on Phi for a constrained run;
+- automatic (batch) processing over all sites of a file, with a warning
+  that "NO in automatic mode" writes no results back;
+- screen/file detail levels (minimum, brief, extensive).
+
+The INVDIR/PSIDIR mathematics are compiled code, not strings, so the
+PSIDIR criterion stays an open question.
+
+## DIAGRA's embedded text
+
+Projection menu: Schmidt lower/upper, Wulff lower/upper (1-4); up to 12
+diagrams in a frame; a diagram is composed of up to 10 plottable types
+drawn from a 16-entry list: poles to faults, fault striae, B/P/T axes of
+faults, fracture joints, bedding, tension cracks, stylolitic joints,
+fracture cleavage, fold axes, tension fibers, stylolitic peaks, metamorphic
+foliation, metamorphic lineation, "non-faults". Diagram diameter is asked
+in centimetres — the fixture's 10 gives the 2002-unit radius at 400
+HPGL units per cm.
+
 # VISION: the screen display (2026-07-29)
 
 The same machine has a program named VISION that draws the plot on screen,

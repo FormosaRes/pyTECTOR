@@ -4,6 +4,7 @@ __pycache__/
 
 # generated output, not source
 *.png
+!docs/img/*.png
 *.csv
 *.hpgl
 batch_log.txt

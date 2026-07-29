@@ -1,17 +1,76 @@
+<div align="center">
+
 # pyTECTOR
 
-A Python reconstruction of Jacques Angelier's **TENSOR** palaeostress inversion
-program (TENSOR 5.45, jan91), written from the published method rather than by
-disassembling the original 16-bit DOS binary.
+**Angelier 古應力反演的 Python 重建版 — TENSOR 5.45 (jan91)**
 
-Angelier 古應力反演程式 **TENSOR 5.45（1991 年 1 月版）** 的 Python 重建版。
-不反譯 16 位元 DOS 執行檔，照他發表的方法重寫，並用原程式留下的九十幾個 run 逐位驗證。
+照論文重寫，不反譯 exe · 92 個原程式 run 逐位驗證 · 回轉與 tilt test · 逐筆影響力診斷 · INFO1／MOHR1／HPGL 原格式輸出
 
-Named after **TECTOR**, Angelier's own name for the suite's tectonic-orientation
-data base, printed in every INFO1 the original ever wrote. 名稱取自 Angelier
-自己的套件資料庫名 **TECTOR**（每個 INFO1 都印著它）。
+[![method](https://img.shields.io/badge/method-Angelier%201990-1f6feb)](https://doi.org/10.1111/j.1365-246X.1990.tb01777.x)
+[![version](https://img.shields.io/badge/version-0.3.0-brightgreen)](pyproject.toml)
+[![python](https://img.shields.io/badge/python-3.x%20%2B%20PyQt5-555)](#quick-start)
+[![tests](https://img.shields.io/badge/tests-11%20suites-2ea44f)](tests/)
+[![fixture](https://img.shields.io/badge/fixture-public%2C%20no%20field%20data-8250df)](tests/fixtures/L12-2/)
 
-**[English](#english)**　｜　**[中文](#中文)**　｜　**User manual: [English](docs/manual.en.md) · [中文](docs/manual.zh.md)**
+[使用手冊 中文](docs/manual.zh.md) · [English manual](docs/manual.en.md) · [原程式對話全文](docs/mesure_oracle.md) · [English below](#english)
+
+</div>
+
+---
+
+> A Python reconstruction of Jacques Angelier's **TENSOR** palaeostress
+> inversion program, written from the published method rather than by
+> disassembling the original 16-bit DOS binary — and checked against
+> ninety-two runs the original itself produced.
+
+Angelier 的直接反演法從一組斷層面與擦痕線理，解出最能解釋它們的簡化應力張量：
+三個主應力方向與形狀比 Φ。`Tensor.exe` 從 1991 年做這件事到現在，而大量已發表的
+古應力工作建立在它之上。
+
+pyTECTOR 做同樣的算術、讀寫同樣的檔案、畫同樣的圖，並補上原程式沒有的東西：
+**回轉（back-tilt）**、**tilt test**、以及**把同一個準則真正最小化**的第二種跑法，
+讓你看得到原方法停在哪裡。
+
+名稱取自 **TECTOR** — Angelier 自己給這套程式的構造方位資料庫命的名，
+印在它寫出的每一個 INFO1 上。
+
+---
+
+## 📸 長什麼樣
+
+| 兩種跑法並列 | 回轉與 tilt test |
+|---|---|
+| ![methods](docs/img/methods.png) | ![back-tilt](docs/img/backtilt.png) |
+
+<div align="center"><img src="docs/img/mohr.png" width="420" alt="Mohr diagram"></div>
+
+> 圖全部由 repo 內的**公開 fixture** `tests/fixtures/L12-2/` 產生 —— 那是一個合成站，
+> 不是野外資料，所以任何人 clone 下來都跑得出同一張圖。
+
+---
+
+## ✨ 核心特色
+
+- 🎯 **照論文重寫，不反譯** — 原檔是 16-bit MZ、5252 個 relocation、無符號表、
+  疑似 overlay ＋軟體浮點模擬。演算法本身在 Angelier (1984, 1990) 寫得很完整，
+  走論文比走二進位快一個量級。
+- ✅ **對原程式逐位驗證** — archive 的 92 個 run 當回歸測試集。前向量（SIGMN／TAU／
+  TAUST／RUP／ANG）逐筆吻合到檔案精度；帶各站自己記錄的 pass 數與 LAMBDA 重跑，
+  **85/90 站三軸差 <3°**。
+- 🔀 **INVDIR ／ S4MIN 兩種跑法並列** — `INVDIR` 是 Angelier 原方法、原程式跑法；
+  `S4MIN` 是同一準則的精確最小值。**兩者都不是真應力**：υ 準則本身有偏差，
+  餵零雜訊的完美 Bott 資料仍差真張量約 4°。並列是為了看見差在哪，不是為了選一個。
+- 🌀 **回轉與 tilt test** — 原程式沒有的功能。角度用拉桿試，σ₁σ₂σ₃ 即時重算；
+  空心圈是實測軸帶過去的位置、星是重新反演的答案，兩者的差距對 INVDIR 而言是
+  **方法的性質不是地質**（14 組 archive 配對實測中位 σ₁ 10.4°）。
+- 🔬 **逐筆影響力診斷** — 「擬合差」和「決定答案」是兩件事。leave-one-out 逐筆重跑，
+  外加**剔除後殘差** ANG\*／RUP\*：用不含該筆的解去量它，不被它自己的拉力粉飾。
+- 📋 **排除要揭露不要隱藏** — 產生「全部資料」與「剔除後」兩個答案並列的區塊，
+  連同軸移動了幾度，寫進匯出的 INFO1。
+- 📄 **原格式輸出** — INFO1／MOHR1 與原檔逐位元組相同（測試逐欄比對）；
+  HPGL 是重播畫圖程式本身，不是第二份實作。
+- 💾 **Session 存檔** — 記錄、參考面、設定、回轉、已算好的解存成一個 JSON。
+  只存張量，其餘載入時重算 —— 存檔裡的 Φ 不可能與存檔裡的張量矛盾。
 
 ---
 

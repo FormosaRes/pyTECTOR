@@ -965,10 +965,10 @@ class BackTiltWindow(QtWidgets.QDialog):
             QtWidgets.QMessageBox.information(
                 self, 'pyTECTOR', 'Invert first: there is nothing to write.')
             return
-        tag = rotate.describe(*self.rot) if self.rot else 'as measured'
+        stem = (rotate.file_stem(self.site_name, *self.rot) if self.rot
+                else rotate.safe_name(self.site_name))
         fn, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, 'Save HPGL', '%s %s.hpgl' % (self.site_name, tag),
-            'HPGL (*.hpgl)')
+            self, 'Save HPGL', stem + '.hpgl', 'HPGL (*.hpgl)')
         if not fn:
             return
 
@@ -1005,9 +1005,10 @@ class BackTiltWindow(QtWidgets.QDialog):
             self, 'pyTECTOR', 'saved %s\n%d panels' % (fn, panels))
 
     def save_png(self):
+        stem = (rotate.file_stem(self.site_name, *self.rot) if self.rot
+                else rotate.safe_name(self.site_name))
         fn, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, 'Save figure', '%s backtilt.png' % self.site_name,
-            'PNG (*.png)')
+            self, 'Save figure', stem + '.png', 'PNG (*.png)')
         if not fn:
             return
         self._draw(annotate=True)

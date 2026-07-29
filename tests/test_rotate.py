@@ -194,6 +194,23 @@ for dipaz, dip in ((224, 27), (44, 27), (348, 44), (10, 80), (330, 15)):
            'ref %03d/%02d at %3d%% -> dip %05.2f (want %05.2f)'
            % (dipaz, dip, pct, rdip, want))
 
+print('\n6c. names offered to a save dialog can actually be saved')
+# The display form writes a plunging axis as 020/10, and a slash in a save
+# dialog is a path separator: "L13 (backtilted 020/10 -30).hpgl" was read as a
+# folder "L13 (backtilted 020" with "10 -30).hpgl" left in the name box.
+BAD = '<>:"/\\|?*'
+for site, spec in (('L13', (20, 10, -30)), ('L13', (20, 0, -30)),
+                   ('L12', (345, 5, 45)), ('CH-01a/b', (20, 10, -30)),
+                   ('0404-4C', (80, 0, -30))):
+    stem = rotate.file_stem(site, *spec)
+    ok(not any(c in BAD for c in stem), '%-36s is writable' % (stem + '.hpgl'))
+ok('/' in rotate.describe(20, 10, -30),
+   'the display form still carries the archive slash, for titles')
+ok(rotate.describe(20, 0, -30) == '(backtilted 020 -30)',
+   'a horizontal axis keeps the archive form exactly')
+ok(rotate.safe_name('  ..  ') == 'site',
+   'a name that sanitises away falls back rather than producing nothing')
+
 print('\n7a. the original did NOT flip slip vectors when it back-tilted')
 # Settles a convention that cannot be settled by reasoning: (n, s) and
 # (-n, -s) are the same datum, so which one a back-tilted file holds is a

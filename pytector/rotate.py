@@ -167,3 +167,34 @@ def describe(trend_deg, plunge_deg, angle_deg):
     return '(backtilted %03d/%02d %+d)' % (round(trend_deg) % 360,
                                            round(plunge_deg),
                                            round(angle_deg))
+
+
+#: characters Windows will not accept in a file name, plus the ones that would
+#: be read as path separators
+_BAD_IN_NAME = '<>:"/\\|?*'
+
+
+def safe_name(text):
+    """A file name that means the same thing and can actually be written."""
+    out = ''.join('-' if c in _BAD_IN_NAME else c for c in str(text))
+    return out.strip().strip('.') or 'site'
+
+
+def describe_file(trend_deg, plunge_deg, angle_deg):
+    """describe(), but usable in a file name.
+
+    The display form carries the plunge as 020/10, and a slash in a save dialog
+    is a path separator: offering "L13 (backtilted 020/10 -30).hpgl" made the
+    dialog read "L13 (backtilted 020" as a folder and put "10 -30).hpgl" in the
+    name box. Same information, written so it survives.
+    """
+    return safe_name(describe(trend_deg, plunge_deg, angle_deg))
+
+
+def file_stem(site, trend_deg=None, plunge_deg=None, angle_deg=None):
+    """'L13(backtilted 020-10 -30)' -- the data's name, then what was done to
+    it, which is how the archive names its folders."""
+    stem = safe_name(site)
+    if trend_deg is None:
+        return stem
+    return '%s%s' % (stem, describe_file(trend_deg, plunge_deg, angle_deg))

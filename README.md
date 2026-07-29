@@ -628,9 +628,11 @@ until one is added.
   spelling of `PYTECTOR_ARCHIVE`.
 - one-click setup: `install.bat` installs the dependencies and puts a desktop
   shortcut up; `pip install .` works too and installs a `pytector` command
-- MESURE 5.51 run on the original hardware as an oracle; its three
-  photographed echoes are now an archive-independent regression test, and
-  docs/mesure_oracle.md transcribes the whole session
+- MESURE 5.51 and TENSOR 5.45 run on the original machine as oracles;
+  docs/mesure_oracle.md transcribes both sessions
+- **a public end-to-end fixture**: tests/fixtures/L12-2 is a complete run of
+  the original programs on a synthetic site, and tests/test_fixture.py checks
+  the whole pipeline against it with no archive needed, axes to 0.05 degrees
 
 **0.2.0**
 
@@ -659,9 +661,9 @@ until one is added.
 
 - writing TENSOR-format data files back out (the site-header fields are now
   known, see [docs/mesure_oracle.md](docs/mesure_oracle.md))
-- a public end-to-end fixture: the synthetic `test` site typed into the real
-  MESURE still needs its `Tensor.exe` INFO1/MOHR1 brought over
-- PSID, R4DT and NDA, Angelier's other methods, deliberately not started
+- R4DT / R4DS / R2DT / R2DS, Angelier's iterative-search methods,
+  deliberately not started (TENSOR's own help documents them, see
+  docs/mesure_oracle.md)
 - a licence
 
 ---
@@ -1096,8 +1098,10 @@ research/           每個常數是怎麼量出來的，該夾有自己的 READM
   環境變數 `PYTENSOR_ARCHIVE` 仍可用，是 `PYTECTOR_ARCHIVE` 的舊拼法
 - 一鍵安裝：`install.bat` 裝好依賴並在桌面放捷徑；`pip install .` 也可以，
   會多一個 `pytector` 指令
-- 在原機器實跑 MESURE 5.51 當 oracle；拍下的三筆回顯成為不需要 archive 的
-  回歸測試，整個流程轉錄在 docs/mesure_oracle.md
+- 在原機器實跑 MESURE 5.51 與 TENSOR 5.45 當 oracle，兩個 session 都轉錄在
+  docs/mesure_oracle.md
+- **公開的端到端 fixture**：tests/fixtures/L12-2 是原程式對合成站的完整一跑，
+  tests/test_fixture.py 不需要 archive 就能對整條管線驗證，軸準到 0.05°
 
 **0.2.0**
 
@@ -1120,9 +1124,8 @@ research/           每個常數是怎麼量出來的，該夾有自己的 READM
 
 - 寫回 TENSOR 格式的資料檔（站頭欄位已經從原程式實跑解出來了，
   見 [docs/mesure_oracle.md](docs/mesure_oracle.md)）
-- 公開的端到端 fixture：打進真 MESURE 的合成站 `test` 還缺 `Tensor.exe`
-  跑出來的 INFO1／MOHR1
-- PSID、R4DT、NDA 這幾個 Angelier 的其他方法，刻意還沒開始
+- R4DT／R4DS／R2DT／R2DS 這幾個 Angelier 的疊代搜尋法，刻意還沒開始
+  （TENSOR 自己的說明有記載，見 docs/mesure_oracle.md）
 - 授權條款
 
 ## 授權與致謝

@@ -188,12 +188,29 @@ def star_sizes(phi, eigenvalues):
     return STAR_BASE + STAR_GAIN * (0.5 - float(phi)) * lam
 
 
-def _draw_star(ax, x, y, index, size, lw=1.1, zorder=9):
+#: One colour per axis, for the diagnostic views only. Warm for the
+#: compressive axis and cool for the extensional one is the usual convention
+#: and it means the three shapes no longer have to be told apart by counting
+#: their points. The plates the original produced were single-pen, so the
+#: publication path never asks for these and 1991 mode falls back to the pen.
+AXIS_INK = ('#B03A2E', '#B9770E', '#1F618D')
+#: ring round a datum flagged by diagnose: deliberately not one of the axis
+#: colours, because it is a statement about the datum, not about an axis
+MARK_INK = '#7D3C98'
+DEGREE = '°'
+
+
+def axis_ink(index):
+    return AXIS_INK[index] if PEN == 'k' else PEN
+
+
+def _draw_star(ax, x, y, index, size, lw=1.1, zorder=9, colour=None):
     px, py = star_polygon(x, y, STAR_POINTS[index], size,
                           inner=STAR_INNER[index],
                           phase_deg=STAR_PHASE[index])
     ax.fill(np.append(px, px[0]), np.append(py, py[0]),
-            facecolor=PAPER, edgecolor=PEN, lw=lw, zorder=zorder, antialiased=AA)
+            facecolor=PAPER, edgecolor=PEN if colour is None else colour,
+            lw=lw, zorder=zorder, antialiased=AA)
 
 
 #: The striae symbol, measured over 94 examples in the archive HPGL.
@@ -404,7 +421,7 @@ def _regime_arrows(ax, result):
 def plot_site(ax, n, s, result=None, certainty=None, sides=None,
               declination=None, site_code=None, header=None,
               program=PROGRAM_TAG, show_axes=True, box=True,
-              reference=None):
+              reference=None, axis_colours=False, mark=None):
     """Angelier-style stereogram of a fault-slip data set.
 
     certainty  per-datum 'C' / 'P' / 'S'; defaults to 'C'
@@ -412,6 +429,12 @@ def plot_site(ax, n, s, result=None, certainty=None, sides=None,
     reference  reference surfaces to draw dashed with their poles, either a
                single (dip azimuth, dip) or a list of
                (dip azimuth, dip, is_the_back_tilt_reference)
+    axis_colours  colour the three stars per axis. Diagnostic views only; the
+               original plates were single-pen and the exported plate leaves
+               this off.
+    mark       per-datum flag string from diagnose.combine, '' / '!' / '!!'.
+               Rings the striae of the data worth looking at, so "which one
+               was that" does not mean counting rows in a table.
     """
     draw_frame(ax, declination=declination, box=box)
     n = np.atleast_2d(np.asarray(n, float))
@@ -445,6 +468,14 @@ def plot_site(ax, n, s, result=None, certainty=None, sides=None,
         conf = 'C' if certainty is None else certainty[i]
         sd = 1.0 if sides is None else float(sides[i])
         _striae_symbol(ax, x, y, hx / h, hy / h, side=sd, conf=conf)
+        if mark is not None and i < len(mark) and mark[i]:
+            # hollow ring round the datum, heavier for '!!'
+            two = mark[i] == '!!'
+            ax.plot([x], [y], marker='o', ms=13.0 if two else 10.5,
+                    markerfacecolor='none',
+                    markeredgecolor=MARK_INK if PEN == 'k' else PEN,
+                    mew=1.5 if two else 0.9,
+                    linestyle='none', zorder=7, antialiased=AA)
 
     if result is not None and show_axes:
         if 'eigenvalues' in result:
@@ -454,7 +485,8 @@ def plot_site(ax, n, s, result=None, certainty=None, sides=None,
         for i, key in enumerate(('sigma1', 'sigma2', 'sigma3')):
             v = vec_from_trend_plunge(*result[key])
             X, Y = schmidt(v[None, :])
-            _draw_star(ax, float(X[0]), float(Y[0]), i, float(sizes[i]))
+            _draw_star(ax, float(X[0]), float(Y[0]), i, float(sizes[i]),
+                       colour=axis_ink(i) if axis_colours else None)
         _regime_arrows(ax, result)
 
     if site_code:
@@ -506,7 +538,7 @@ def plot_reference(ax, dipaz_deg, dip_deg, is_ref=False, lw=None,
 CARRY_MS = (9.0, 7.6, 6.4)
 
 
-def plot_carried_axes(ax, carried, target=None, lw=None, zorder=8):
+def plot_carried_axes(ax, carried, target=None, lw=None, zorder=10):
     """Where the measured stress axes land when the rotation is applied to
     them: open rings, with a dashed arc back to the re-inverted answer.
 
@@ -524,13 +556,21 @@ def plot_carried_axes(ax, carried, target=None, lw=None, zorder=8):
     the fourteen back-tilt pairs in the Chingshuichi archive, run by the
     original program itself, the median separation is 10 degrees on sigma1 and
     about 24 degrees on sigma2 and sigma3.
+
+    The reading it has to support is "this axis was here, and re-inverting put
+    it there", so the two ends are given one colour per axis and joined by a
+    solid arc with a head on the answer end and the separation written beside
+    it. The earlier version drew both ends in the same black with a dashed line
+    between, which left the three pairs to be matched up by counting the points
+    on the stars.
     """
     lw = STROKE if lw is None else lw
     for i, key in enumerate(('sigma1', 'sigma2', 'sigma3')):
+        ink = axis_ink(i)
         v = vec_from_trend_plunge(*carried[key])
         X, Y = schmidt(v[None, :])
         ax.plot(X, Y, marker='o', ms=CARRY_MS[i], markerfacecolor='none',
-                markeredgecolor=PEN, mew=lw * 0.9, linestyle='none',
+                markeredgecolor=ink, mew=lw * 1.3, linestyle='none',
                 zorder=zorder, antialiased=AA)
         if target is None:
             continue
@@ -543,11 +583,25 @@ def plot_carried_axes(ax, carried, target=None, lw=None, zorder=8):
         # slerp. Every point is a positive mix of two lower-hemisphere ends, so
         # the arc stays in the lower hemisphere and never has to be split.
         th = np.arccos(c)
-        t = np.linspace(0.0, 1.0, 24)[:, None]
+        t = np.linspace(0.0, 1.0, 48)[:, None]
         p = (np.sin((1 - t) * th) * v + np.sin(t * th) * w) / np.sin(th)
         X, Y = schmidt(p)
-        ax.plot(X, Y, color=PEN, lw=lw * 0.7, linestyle=(0, (2, 2)),
+        ax.plot(X, Y, color=ink, lw=lw * 1.1, solid_capstyle='round',
                 zorder=zorder - 1, antialiased=AA)
+        # a head at the answer end, so the pair reads as a movement and not as
+        # two unrelated marks
+        if len(X) > 3:
+            ax.annotate('', xy=(X[-1], Y[-1]), xytext=(X[-4], Y[-4]),
+                        arrowprops=dict(arrowstyle='-|>', color=ink,
+                                        lw=lw * 1.1, shrinkA=0, shrinkB=0),
+                        zorder=zorder - 1, annotation_clip=False)
+        # and the size of the move, which is the number the window is about
+        j = len(X) // 2
+        ax.annotate('%.0f%s' % (np.degrees(th), DEGREE),
+                    xy=(X[j], Y[j]), xytext=(0, 5),
+                    textcoords='offset points', ha='center', va='bottom',
+                    fontsize=7.5, color=ink, zorder=zorder + 1,
+                    annotation_clip=False)
 
 
 def reference_from_vectors(nvec):

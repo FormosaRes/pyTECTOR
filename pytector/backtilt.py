@@ -31,8 +31,8 @@ matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 
-from . import (core, entry, hpgl, invdir, modern, penrec, plot, rotate,
-               tensorfile, tilt, tiltui)
+from . import (core, diagnose, entry, hpgl, invdir, modern, penrec, plot,
+               rotate, tensorfile, tilt, tiltui)
 
 DEG = '°'
 PHI = 'Φ'
@@ -225,10 +225,20 @@ class BackTiltWindow(QtWidgets.QDialog):
         self.cb_carry = QtWidgets.QCheckBox('carried axes')
         self.cb_carry.setChecked(True)
         self.cb_carry.setToolTip(
-            'Draw the measured axes put through the same rotation, as open '
-            'rings, so you can see where they went.')
+            'Ring = the measured axis put through the same rotation, i.e. '
+            'where it should be.\nStar = the answer from re-inverting the '
+            'rotated data.\nThe arrow joins the pair and is labelled with the '
+            'gap between them.')
         self.cb_carry.toggled.connect(lambda _v: self._draw())
         row.addWidget(self.cb_carry)
+        self.cb_flag = QtWidgets.QCheckBox('flag data')
+        self.cb_flag.setChecked(True)
+        self.cb_flag.setToolTip(
+            'Ring the faults that fit badly or that are holding the answer in '
+            'place, and list them underneath. Leave-one-out, so "holding the '
+            'answer" means the axes actually move without it.')
+        self.cb_flag.toggled.connect(lambda _v: self._refresh_flags())
+        row.addWidget(self.cb_flag)
         row.addStretch(1)
 
         self.btn_run = QtWidgets.QPushButton('Invert both')
@@ -518,6 +528,43 @@ class BackTiltWindow(QtWidgets.QDialog):
         self.worker = w
         w.start()
 
+    def _flags(self, which):
+        """Per-datum diagnostics for one of the two states, cached.
+
+        Leave-one-out, so it needs an inversion per datum. That is a few
+        milliseconds each with INVDIR, but it is not free, so it is computed
+        once per solution and kept.
+        """
+        if not self.cb_flag.isChecked():
+            return None
+        key = self.keys()
+        if not key:
+            return None
+        res = self.results.get('%s_%s' % (which, key[0]))
+        if res is None or len(self.records) < 5:
+            return None
+        cache = getattr(self, '_flag_cache', {})
+        tag = (which, key[0], id(res))
+        if tag not in cache:
+            n, s = self.n_s
+            if which == 'rot' and self.rot:
+                n, s = rotate.rotate_site(n, s, *self.rot)
+            solver = ((lambda a, b: invdir.run(a, b, n_pass=self.n_pass)['T'])
+                      if key[0] == 'A'
+                      else (lambda a, b: modern.run(a, b, n_starts=200)['T']))
+            try:
+                cache = dict(cache)
+                cache[tag] = diagnose.combine(res, n, s, solver)
+            except Exception:
+                cache[tag] = []
+            self._flag_cache = cache
+        return cache.get(tag) or None
+
+    def _refresh_flags(self):
+        self._flag_cache = {}
+        self._draw()
+        self.txt.setPlainText(self.summary())
+
     def _failed(self, msg, gen):
         if gen != self._gen:
             return
@@ -614,6 +661,18 @@ class BackTiltWindow(QtWidgets.QDialog):
                                 r['phi']))
             L.append('')
 
+        for which, lab in (('raw', 'AS MEASURED'), ('rot', 'BACK-TILTED')):
+            rows = self._flags(which)
+            if not rows:
+                continue
+            hot = [r for r in rows if r['flag']]
+            L.append('DATA WORTH CHECKING, %s   (%d of %d flagged)'
+                     % (lab, len(hot), len(rows)))
+            L.append(diagnose.text_table(rows, limit=8))
+            if len(hot) > 8:
+                L.append('   ... and %d more' % (len(hot) - 8))
+            L.append('')
+
         L.append('The ring is the measured answer carried through the '
                  'rotation; the star is the answer from re-inverting the')
         L.append('rotated data. For S4MIN they coincide, because S4 is '
@@ -676,12 +735,15 @@ class BackTiltWindow(QtWidgets.QDialog):
             raw = self.results.get('raw_%s' % k) if k else None
             rot = self.results.get('rot_%s' % k) if k else None
 
+            fraw = self._flags('raw') if k else None
+            frot = self._flags('rot') if k else None
             ax = cell(2 * j + 1, 'AS MEASURED' + ('   ' + name if name else ''),
                       'no rotation applied')
             plot.plot_site(ax, n, s, raw, certainty=conf, sides=sides,
                            site_code=self.site_name,
                            reference=self.reference_now(False),
-                           declination=self.decl,
+                           declination=self.decl, axis_colours=True,
+                           mark=[d['plot_mark'] for d in fraw] if fraw else None,
                            header='AS MEASURED  no rotation')
             if annotate and raw:
                 plot.annotate_result(ax, raw, n_data=len(self.records))
@@ -691,18 +753,48 @@ class BackTiltWindow(QtWidgets.QDialog):
             plot.plot_site(ax, rn, rs, rot, certainty=conf, sides=sides_rot,
                            site_code=self.site_name,
                            reference=self.reference_now(True),
-                           declination=self.decl,
+                           declination=self.decl, axis_colours=True,
+                           mark=[d['plot_mark'] for d in frot] if frot else None,
                            header='BACK-TILTED' + tag)
             if raw and self.rot and self.cb_carry.isChecked():
                 plot.plot_carried_axes(ax, carried(raw, *self.rot), rot)
             if annotate and rot:
                 plot.annotate_result(ax, rot, n_data=len(self.records))
 
+        if not annotate and self.rot and self.cb_carry.isChecked():
+            self._legend()
         self.fig.subplots_adjust(left=0.02, right=0.98,
                                  top=0.99 if annotate else 0.90,
-                                 bottom=0.10 if annotate else 0.04,
+                                 bottom=0.12 if annotate else 0.09,
                                  wspace=0.02, hspace=0.28)
         self.canvas.draw()
+
+    def _legend(self):
+        """Say what the marks mean instead of leaving them to be worked out.
+
+        The window was readable only once you already knew that the rings were
+        the measured axes carried through the rotation and the stars were the
+        re-inversion. That is the one thing it exists to show, so it is written
+        down, in the same colours as the marks themselves.
+        """
+        c = '#1E1E1C' if plot.PEN == 'k' else plot.PEN
+        self.fig.text(0.02, 0.028,
+                      'ring = measured axis carried through the rotation'
+                      '      → star = re-inverted from the rotated data'
+                      '      arrow labelled with the gap',
+                      fontsize=8.5, color=c, va='bottom')
+        x = 0.02
+        for i, nm in enumerate(('σ1', 'σ2', 'σ3')):
+            self.fig.text(x, 0.062, nm, fontsize=9, color=plot.axis_ink(i),
+                          va='bottom', fontweight='600')
+            x += 0.028
+        if self.cb_flag.isChecked():
+            self.fig.text(x + 0.02, 0.062,
+                          '◎ changes the answer   '
+                          '○ far outside the quality bands',
+                          fontsize=8.5,
+                          color=plot.MARK_INK if plot.PEN == 'k' else plot.PEN,
+                          va='bottom')
 
     def save_hpgl(self):
         """The restored stereogram as HPGL, the format the original plotted in.

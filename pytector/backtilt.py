@@ -294,11 +294,21 @@ class BackTiltWindow(QtWidgets.QDialog):
         self.txt_data.setObjectName('report')
         self.txt_data.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
         lv.addWidget(self.txt_data, 1)
+        brow = QtWidgets.QHBoxLayout()
+        brow.setSpacing(6)
         b = QtWidgets.QPushButton('Copy')
         b.setToolTip('Copy the back-tilted records to the clipboard, in the '
                      'four-field entry format, ready to paste into a new site.')
         b.clicked.connect(self._copy_data)
-        lv.addWidget(b)
+        brow.addWidget(b)
+        self.btn_adopt = QtWidgets.QPushButton('Send to main window')
+        self.btn_adopt.setToolTip(
+            'Replace the main window’s data with these back-tilted '
+            'records, named the way the archive names them. The solutions are '
+            'dropped, because they belong to the data that produced them.')
+        self.btn_adopt.clicked.connect(self._adopt)
+        brow.addWidget(self.btn_adopt)
+        lv.addLayout(brow)
 
         self.fig = Figure(figsize=(11, 5.6), facecolor='white')
         self.canvas = Canvas(self.fig)
@@ -873,6 +883,41 @@ class BackTiltWindow(QtWidgets.QDialog):
         self.lbl_data.setText(
             'rake is stored with Angelier’s +180 convention, the same as '
             'in the site file. %s' % rotate.describe(*self.rot))
+
+    def apply_rotation(self, rot, mode=None):
+        """Set the rotation from outside, e.g. when a session is reopened."""
+        if not rot:
+            return
+        self.cmb_src.setCurrentIndex(1 if mode is None else int(mode))
+        self._syncing = True
+        for e, v in zip(self.fields, rot):
+            e.setText('%.4g' % float(v))
+        self._syncing = False
+        self.sp_frac.setValue(100)
+        self._changed()
+
+    def _adopt(self):
+        """Hand the back-tilted records to the main window.
+
+        This is the step the archive records in its folder names: the data were
+        rotated elsewhere, written out as a new site, and re-run. Doing it here
+        means the rotation settled on in this window is the one carried over,
+        rather than being retyped.
+        """
+        recs = self.rotated_records()
+        if not recs or self.main is None:
+            QtWidgets.QMessageBox.information(
+                self, 'pyTECTOR', 'Set a rotation first.')
+            return
+        # carry the letters across; as_records only knows the geometry
+        out = []
+        for a, b in zip(self.records, recs):
+            r = dict(a)
+            r.update(dipaz=b['dipaz'], dip=b['dip'], rake=b['rake'])
+            out.append(r)
+        name = '%s %s' % (self.site_name, rotate.describe(*self.rot))
+        self.main.adopt_records(out, name)
+        self.lbl_data.setText('sent to the main window as %s' % name)
 
     def _copy_data(self):
         recs = self.rotated_records()

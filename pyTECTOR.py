@@ -36,7 +36,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 
 from pytector import (about, backtilt, core, diagnose, entry, hpgl, invdir,
-                      modern, penrec, plot, report, retro, splash,
+                      modern, penrec, plot, report, retro, session, splash,
                       tensorfile)
 from pytector.ui_style import QSS, MUTED
 
@@ -153,6 +153,7 @@ class Worker(QtCore.QThread):
                                lam_printed=self.lam_printed)
                 res = core.summary(r['T'], self.n, self.s)
                 res['T'] = r['T']
+                res['T_invdir'] = r['T_invdir']     # so a session can store it
                 res['lambda_trace'] = r['lambda_trace']
                 # the pre-PSIDIR solution, so INFO1 can print both blocks
                 res['invdir_summary'] = core.summary(r['T_invdir'],
@@ -397,6 +398,14 @@ class Main(QtWidgets.QMainWindow):
         tb.setMovable(False)
         tb.setToolButtonStyle(QtCore.Qt.ToolButtonTextOnly)
         tb.addAction('Open site').triggered.connect(self.open_site)
+        a = tb.addAction('Open session')
+        a.setToolTip('Reopen a saved working state: the records, the reference '
+                     'surfaces, the settings and the solutions already found.')
+        a.triggered.connect(self.open_session)
+        a = tb.addAction('Save session')
+        a.setToolTip('Write everything to one file so none of it has to be '
+                     'entered or inverted again.')
+        a.triggered.connect(self.save_session)
         tb.addAction('Scan folder').triggered.connect(self.scan_folder)
         tb.addAction('Clear').triggered.connect(self.clear_all)
         tb.addSeparator()
@@ -1280,6 +1289,113 @@ class Main(QtWidgets.QMainWindow):
             return '\n'.join(out)
         except Exception:
             return None
+
+    def _declination(self):
+        try:
+            return float(self.ed_decl.text().strip())
+        except (AttributeError, ValueError):
+            return plot.MAGNETIC_OFFSET
+
+    # ------------------------------------------------------------ session --
+    def _session_state(self):
+        bt = getattr(self, 'bt_window', None)
+        return dict(
+            site_name=self.site_name, site_code=self.site_code,
+            declination=self._declination(), n_pass=self.sp_pass.value(),
+            use_invdir=self.cb_a.isChecked(), use_s4min=self.cb_b.isChecked(),
+            use_archive_lambda=(self.cb_lam.isChecked()
+                                if self.cb_lam.isEnabled() else None),
+            archive_lambda=self.archive_lambda,
+            rotation=list(bt.rot) if (bt and bt.rot) else None,
+            rotation_mode=(bt.cmb_src.currentIndex() if bt else None),
+            records=self.records, planes=self.planes, results=self.results)
+
+    def save_session(self):
+        if not self.records:
+            QtWidgets.QMessageBox.information(
+                self, 'pyTECTOR', 'Nothing to save yet.')
+            return
+        fn, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, 'Save session', '%s%s' % (self.site_name, session.EXT),
+            'pyTECTOR session (*%s);;All files (*)' % session.EXT)
+        if not fn:
+            return
+        try:
+            session.save(fn, self._session_state())
+        except Exception as exc:
+            QtWidgets.QMessageBox.warning(self, 'pyTECTOR', str(exc))
+            return
+        self.status.showMessage('saved ' + fn)
+
+    def open_session(self):
+        fn, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, 'Open session', '',
+            'pyTECTOR session (*%s);;All files (*)' % session.EXT)
+        if not fn:
+            return
+        try:
+            head = session.load(fn)                    # records first
+            recs = head['records']
+            n, s = entry.records_to_arrays(
+                [r for r in recs if r.get('use', True)])
+            st = session.load(fn, n=n, s=s)            # then rebuild results
+        except Exception as exc:
+            QtWidgets.QMessageBox.warning(self, 'pyTECTOR', str(exc))
+            return
+
+        self._loading = True
+        try:
+            self.records = st['records']
+            self.planes = st['planes']
+            self.site_name = st.get('site_name', '01')
+            self.site_code = st.get('site_code', '01')
+            self.ed_site.setText(self.site_name)
+            if st.get('declination') is not None:
+                self.ed_decl.setText('%g' % st['declination'])
+            if st.get('n_pass'):
+                self.sp_pass.setValue(int(st['n_pass']))
+            self.cb_a.setChecked(bool(st.get('use_invdir', True)))
+            self.cb_b.setChecked(bool(st.get('use_s4min', True)))
+            self.archive_lambda = st.get('archive_lambda')
+            self.cb_lam.setEnabled(self.archive_lambda is not None)
+            self.cb_lam.setChecked(bool(st.get('use_archive_lambda')))
+            self.archive = None
+            self.strip_ar.hide()
+            self.results = st['results']
+        finally:
+            self._loading = False
+        # the results came back from the file, so they describe this data:
+        # stamp the fingerprint or they would be flagged out of date at once
+        self._result_print = self._fingerprint()
+        self._refresh()
+        bt = getattr(self, 'bt_window', None)
+        if bt is not None and st.get('rotation'):
+            bt.apply_rotation(st['rotation'], st.get('rotation_mode'))
+        self.status.showMessage('opened %s   %d faults, %d result%s'
+                                % (fn, len(self.records), len(self.results),
+                                   '' if len(self.results) == 1 else 's'))
+
+    def adopt_records(self, records, name):
+        """Take a set of records over from another window, back-tilted data
+        being the case this exists for.
+
+        The results are dropped rather than carried across: they belong to the
+        data that produced them, and silently keeping them beside different
+        numbers is how a figure ends up captioned with the wrong solution.
+        """
+        self.records = [dict(r) for r in records]
+        self.site_name = name
+        self.ed_site.setText(name)
+        self.results = {}
+        self.archive = None
+        self.strip_ar.hide()
+        self.archive_lambda = None
+        self.cb_lam.setEnabled(False)
+        self.cb_lam.setChecked(False)
+        self._refresh()
+        self.status.showMessage(
+            '%d back-tilted records adopted as %s - press Invert'
+            % (len(self.records), name))
 
     def _save_report(self, which):
         r, kw = self._info_kwargs()

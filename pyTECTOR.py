@@ -1365,8 +1365,7 @@ class Main(QtWidgets.QMainWindow):
                 self, 'pyTECTOR', 'Nothing to save yet.')
             return
         fn, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, 'Save session',
-            rotate.safe_name(self.site_name) + session.EXT,
+            self, 'Save session', session.default_path(self.site_name),
             'pyTECTOR session (*%s);;All files (*)' % session.EXT)
         if not fn:
             return
@@ -1379,7 +1378,7 @@ class Main(QtWidgets.QMainWindow):
 
     def open_session(self):
         fn, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, 'Open session', '',
+            self, 'Open session', session.default_dir(),
             'pyTECTOR session (*%s);;All files (*)' % session.EXT)
         if not fn:
             return

@@ -26,10 +26,10 @@ MOHR1:
     rows     SIGMN %10.3f then TAU, TAUST, RUP, ANG each %8.3f
     last     the same '03' result line that INFO1 carries
 
-Identification: the banner names pyTENSOR rather than claiming to be
+Identification: the banner names pyTECTOR rather than claiming to be
 TENSOR 5.45. Everything a downstream reader parses (the fixed-width data
 lines and the '03' record) keeps the original layout, so the files still
-round-trip through pytensor.tensorfile.
+round-trip through pytector.tensorfile.
 """
 import numpy as np
 
@@ -38,7 +38,7 @@ from .core import estimators, describe
 
 HEAD = """\
  >>>>>>>>>>> FILE READY TO BE CREATED  : INFO1
- pyTENSOR, A PYTHON RECONSTRUCTION OF THE PROGRAMS BY JACQUES ANGELIER,
+ pyTECTOR, A PYTHON RECONSTRUCTION OF THE PROGRAMS BY JACQUES ANGELIER,
  QUANTITATIVE TECTONICS, UNIVERSITY P. M. CURIE, 75252 PARIS CEDEX 05, FRANCE.
 
               ****************************************************
@@ -46,7 +46,7 @@ HEAD = """\
               ****************************************************
 
  >>>>>>>>>>> FILE READY TO BE CREATED  : MOHR1
-               pyTENSOR {ver}, after Progr. TENSOR 5.45 (jan91)
+               pyTECTOR {ver}, after Progr. TENSOR 5.45 (jan91)
                method and layout: J. Angelier, 1975-1991
                ++++++++++++++++++++++++++++++++++++++++++++++
                ++++  CALCUL DU  TENSEUR DES CONTRAINTES  ++++
@@ -61,7 +61,7 @@ HEAD = """\
   (1984) [Journal of Geophys.Res.,89,B7,5835-5848]. The
   method is described in detail in J. Angelier (1990),
   Geophysical J. International, 103, 363-376.
-  pyTENSOR reproduces it in Angelier's own (alpha, beta,
+  pyTECTOR reproduces it in Angelier's own (alpha, beta,
   gamma, psi) parametrisation, so the LAMBDA adjustment
   and the PSIDIR step behave as in the original.
  MODE B : the same criterion, minimised globally with
@@ -169,7 +169,7 @@ def info1_text(site_file, res, n_data, invdir=None, lam_invdir=None,
             return ' * ' + text[:69].ljust(69) + '*'
 
         L.append(bar)
-        L.append(boxed('PROGRAM pyTENSOR, OPTION %-4s  ACC=%d PON=1   REF.  1'
+        L.append(boxed('PROGRAM pyTECTOR, OPTION %-4s  ACC=%d PON=1   REF.  1'
                        '   AFTER ANGELIER' % (method, acc)))
         L.append(boxed('SITE %-14s SEL=CPS WEI=0-9 AGE=9****(9)   NBR=%3d'
                        ' TOT=%3d.' % (site, n_data, n_data)))

@@ -15,9 +15,9 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))))
-from pytensor import hpgl, plot, tensorfile
+from pytector import hpgl, plot, tensorfile
 
-from pytensor.archive import ROOT
+from pytector.archive import ROOT
 DOT_R = 0.028
 
 

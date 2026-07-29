@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))))
-from pytensor import core, entry, invdir, plot, retro
+from pytector import core, entry, invdir, plot, retro
 
 TYPED = [('SN', '174', '74E', '62N'), ('SN', '169', '75E', '59N'),
          ('PN', '135', '85W', '80S'), ('PN', '136', '88W', '81S'),

@@ -14,7 +14,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from pytensor import core, entry, hpgl, invdir, modern, plot
+from pytector import core, entry, hpgl, invdir, modern, plot
 
 TYPED = [
     ('SN', '174', '74E', '62N'), ('SN', '169', '75E', '59N'),

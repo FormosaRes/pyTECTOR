@@ -18,9 +18,9 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from pytensor import core, report, tensorfile
+from pytector import core, report, tensorfile
 
-from pytensor.archive import ROOT
+from pytector.archive import ROOT
 SITES = [('L12', 'L12'), ('0406-7', '0406-04')]
 NUM = re.compile(r'-?\d+\.?\d*')
 

@@ -17,9 +17,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
 
-from pytensor import (core, entry, invdir, modern, penrec, plot, report,
+from pytector import (core, entry, invdir, modern, penrec, plot, report,
                       tensorfile, hpgl)
-from pytensor.ui_style import QSS
+from pytector.ui_style import QSS
 
 fails = []
 
@@ -45,7 +45,7 @@ ok('font-family' in QSS.split('QPlainTextEdit#report')[1].split('}')[0],
 ok('line-height' not in QSS, 'no line-height (Qt stylesheets ignore it)')
 
 print('\n2. the GUI source only calls things that exist')
-src = open(os.path.join(ROOT, 'pyTENSOR.py'), encoding='utf-8').read()
+src = open(os.path.join(ROOT, 'pyTECTOR.py'), encoding='utf-8').read()
 tree = ast.parse(src)
 mods = {'core': core, 'entry': entry, 'invdir': invdir, 'modern': modern,
         'plot': plot, 'report': report, 'tensorfile': tensorfile,
@@ -56,7 +56,7 @@ for node in ast.walk(tree):
             and node.value.id in mods):
         if not hasattr(mods[node.value.id], node.attr):
             missing.add('%s.%s' % (node.value.id, node.attr))
-ok(not missing, 'every pytensor attribute referenced exists %s'
+ok(not missing, 'every pytector attribute referenced exists %s'
    % (sorted(missing) if missing else ''))
 
 print('\n3. the data path the GUI drives')

@@ -12,9 +12,9 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))))
-from pytensor import hpgl, tensorfile, plot as pplot
+from pytector import hpgl, tensorfile, plot as pplot
 
-from pytensor.archive import ROOT
+from pytector.archive import ROOT
 CONF = {'1': 'C', '2': 'P', '3': 'S'}
 
 folder, datafile = '0406-7', '0406-04'

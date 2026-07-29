@@ -6,7 +6,7 @@ import sys
 
 import numpy as np
 
-path = sys.argv[1] if len(sys.argv) > 1 else 'pytensor_AB_comparison.csv'
+path = sys.argv[1] if len(sys.argv) > 1 else 'pytector_AB_comparison.csv'
 rows = list(csv.DictReader(open(path, encoding='utf-8-sig')))
 n = np.array([int(r['n']) for r in rows])
 d1 = np.array([float(r['d_s1']) for r in rows])

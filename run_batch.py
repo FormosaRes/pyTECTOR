@@ -11,9 +11,9 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from pytensor import core, invdir, modern, tensorfile
+from pytector import core, invdir, modern, tensorfile
 
-from pytensor.archive import ROOT
+from pytector.archive import ROOT
 
 DEFAULT_ROOT = ROOT
 def axis_gap(a, b):
@@ -97,5 +97,5 @@ def main(root, out_csv):
 
 if __name__ == '__main__':
     root = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_ROOT
-    out = sys.argv[2] if len(sys.argv) > 2 else 'pytensor_AB_comparison.csv'
+    out = sys.argv[2] if len(sys.argv) > 2 else 'pytector_AB_comparison.csv'
     main(root, out)

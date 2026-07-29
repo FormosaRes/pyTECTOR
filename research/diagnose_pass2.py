@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""L12 needs a second INVDIR pass, and pyTENSOR lands 1 degree off with a
+"""L12 needs a second INVDIR pass, and pyTECTOR lands 1 degree off with a
 slightly WORSE S4. 0406-7, which needs only one pass, reproduces to 0.05
 degrees. So the residual is in what lambda is carried into pass 2.
 
@@ -12,8 +12,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))))
-from pytensor import core, invdir, tensorfile
-from pytensor.archive import ROOT, require
+from pytector import core, invdir, tensorfile
+from pytector.archive import ROOT, require
 
 require('diagnose_pass2.py')
 d = os.path.join(ROOT, 'L12')
@@ -38,11 +38,11 @@ T1, s4_1, psi1, p1 = invdir.invdir_pass(n, s, np.sqrt(3) / 2)
 d1 = core.describe(T1)
 scale1 = np.sqrt(1.5 / float((d1['eigenvalues'] ** 2).sum()))
 print('\npass 1 at lambda = %.4f' % (np.sqrt(3) / 2))
-print('   raw taumax %.4f   -> pyTENSOR carries this into pass 2'
+print('   raw taumax %.4f   -> pyTECTOR carries this into pass 2'
       % d1['taumax'])
 print('   the same rescaled onto the normalised tensor: %.4f'
       % (d1['taumax'] * scale1))
-print('   lambda printed by pyTENSOR for pass 2: %.2f'
+print('   lambda printed by pyTECTOR for pass 2: %.2f'
       % ((np.sqrt(3) / 2) * scale1))
 print('   lambda printed by TENSOR:              0.76')
 

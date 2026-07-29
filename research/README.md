@@ -1,10 +1,10 @@
 # research/ — how every constant was measured
 
-pyTENSOR is a reimplementation, not a guess. These are the scripts that derived
-each number in `pytensor/`, kept so the claims in the main README can be
+pyTECTOR is a reimplementation, not a guess. These are the scripts that derived
+each number in `pytector/`, kept so the claims in the main README can be
 checked rather than taken on trust.
 
-They all read the reference archive, so they need `PYTENSOR_ARCHIVE` pointing
+They all read the reference archive, so they need `PYTECTOR_ARCHIVE` pointing
 at the folder of original TENSOR runs. Without it they exit with a message.
 
 ## The algorithm
@@ -31,7 +31,7 @@ not the figure captions.
 | `fit_star_size.py` | the star size is not constant. `size = 0.1004 + 0.0928 (0.5 - Phi) lambda`, fitted over 21 plots and 63 stars, rms 0.00063 |
 | `zoom_arrows.py`, `probe_striae_glyph.py` | which strokes make up one striae symbol |
 | `measure_striae_glyph.py`, `catalogue_striae.py` | the shear-couple geometry across 94 symbols, and the three confidence styles |
-| `compare_style.py` | side-by-side check of the original against pyTENSOR's rendering |
+| `compare_style.py` | side-by-side check of the original against pyTECTOR's rendering |
 
 ## The two runs
 

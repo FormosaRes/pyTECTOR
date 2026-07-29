@@ -11,9 +11,9 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))))
-from pytensor import core, hpgl, tensorfile
+from pytector import core, hpgl, tensorfile
 
-from pytensor.archive import ROOT
+from pytector.archive import ROOT
 def primitive(polys):
     best, score = None, -1
     for _pen, p in polys:

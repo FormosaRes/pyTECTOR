@@ -1,4 +1,4 @@
-# pyTENSOR 使用手冊
+# pyTECTOR 使用手冊
 
 介面每個功能、完整操作流程、輸入與輸出格式。
 方法本身（準則、兩種跑法、λ、等變性）在 [README](../README.md)；
@@ -25,11 +25,16 @@
 
 ## 1. 安裝與啟動
 
-需求：Python 3 加 numpy、scipy、matplotlib、PyQt5（Anaconda 全都有）。
+**一鍵安裝**：雙擊 repo 根目錄的 **`install.bat`**。它會自己找 Python
+（優先 Anaconda）、裝好四個依賴（numpy、scipy、matplotlib、PyQt5）、
+做編譯檢查、在桌面放一個 pyTECTOR 捷徑。可以重複執行，不會弄壞什麼。
+
+手動的話：Python 3 加上那四個套件（Anaconda 只缺 PyQt5），然後：
 
 ```
-pyTENSOR.bat        雙擊啟動
-python pyTENSOR.py  或從命令列
+pyTECTOR.bat        雙擊啟動
+python pyTECTOR.py  或從命令列
+pip install .       亦可，會安裝 pytector 指令
 ```
 
 開啟畫面（Angelier 的台灣塊體圖）顯示 4 秒，點一下、按任意鍵、或等它自己消失都會進入主程式。
@@ -38,7 +43,7 @@ python pyTENSOR.py  或從命令列
 選用的環境變數：
 
 ```
-set PYTENSOR_ARCHIVE=<放 TENSOR run 資料夾的目錄>
+set PYTECTOR_ARCHIVE=<放 TENSOR run 資料夾的目錄>
 ```
 
 只有測試與推導腳本用它；日常操作不需要。
@@ -282,11 +287,11 @@ carried vs re-inverted 各軸夾角。回轉後軸**遠離**水平垂直時直�
 | Save PNG（主視窗） | 目前的圖，300 dpi。匯出版去掉螢幕標題、加上 Angelier 式兩行數字標註（S1 S2 S3／PHI ANG RUP N），維持原版面 |
 | Save PNG（回轉視窗） | 實測＋回轉並排圖，同樣帶標註 |
 | Save HPGL | 繪圖機向量檔，**原程式的方言與座標**（scale 2002、origin 2908,3008，可跟 archive 的 HPGL 疊圖）。內容＝重播螢幕畫圖程式，整張圖都在：擦痕、刻度、十字、N/M、外框、粗箭頭、參考面 |
-| Save INFO1 | 完整版 INFO1（含橫幅），版面與原程式逐欄一致，可被 `pytensor.tensorfile` 讀回 |
+| Save INFO1 | 完整版 INFO1（含橫幅），版面與原程式逐欄一致，可被 `pytector.tensorfile` 讀回 |
 | Save MOHR1 | 同上，MOHR1 |
 
 注意：INFO1／MOHR1 以畫面上**第一個有結果的方法**為準（勾了 INVDIR 就是 INVDIR）。
-橫幅寫 pyTENSOR，不冒充 TENSOR 5.45；機器讀的部分（定寬表、03 行）維持原樣。
+橫幅寫 pyTECTOR，不冒充 TENSOR 5.45；機器讀的部分（定寬表、03 行）維持原樣。
 
 ## 10. 1991 模式
 
@@ -311,7 +316,7 @@ python demo_fitted.py                  畫 observed vs fitted 對照圖
 函式庫可以直接 import 用，不經 GUI：
 
 ```python
-from pytensor import read_site, invdir, modern, core
+from pytector import read_site, invdir, modern, core
 site = read_site(r'...\L12\L12')
 r = invdir.run(site.n, site.s, n_pass=2)      # INVDIR
 b = modern.run(site.n, site.s)                # S4MIN

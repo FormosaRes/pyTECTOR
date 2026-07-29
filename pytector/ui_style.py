@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Stylesheet for the pyTENSOR desktop app.
+"""Stylesheet for the pyTECTOR desktop app.
 
 Deliberately neutral: the stereograms are pure black and white in Angelier's
 own style, so the interface stays out of their way. This is NOT the pyADR

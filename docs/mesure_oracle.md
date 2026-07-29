@@ -101,7 +101,7 @@ site file's header line carries.
 **Declination semantics: east positive, west negative, in degrees.** The
 test file stored +2. The M mark measured off the archive HPGL sits at 1.95
 degrees east of north, consistent with a stored declination of +2 drawn by
-DESSIN. pyTENSOR's `decl` field follows the same convention.
+DESSIN. pyTECTOR's `decl` field follows the same convention.
 
 ## Validation
 
@@ -119,7 +119,7 @@ rounding. Everything else agrees to a tenth of a degree.
 ## Why this matters for the repository
 
 The field archive cannot be published, so until now every regression fixture
-needed `PYTENSOR_ARCHIVE`. A synthetic site typed into the real MESURE, run
+needed `PYTECTOR_ARCHIVE`. A synthetic site typed into the real MESURE, run
 through the real TENSOR, photographed or copied out, is an oracle with no
 privacy constraint at all. The three records above are the first piece. If
 the same `test` site is run through `Tensor.exe` and its INFO1 and MOHR1 are

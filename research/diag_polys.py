@@ -8,9 +8,9 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))))
-from pytensor import hpgl
+from pytector import hpgl
 
-from pytensor.archive import ROOT
+from pytector.archive import ROOT
 polys, labels, cmds = hpgl.read(os.path.join(ROOT, '0406-7', 'HPGL'))
 
 best, score = None, -1

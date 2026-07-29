@@ -4,7 +4,7 @@
 HPGL is plain-text plotter vector language, so the HPGL file next to every run
 is literally the picture Angelier's program drew, stroke by stroke. That makes
 it the authoritative reference for the house drawing style, and it means
-pyTENSOR can both display the originals and emit output in the same form.
+pyTECTOR can both display the originals and emit output in the same form.
 
 Commands seen in the archive: IN, SP, PU, PD, PA, LT, CS, SI, DI, LB, PG.
 """
@@ -108,14 +108,14 @@ def draw(ax, polylines, labels=None, lw=0.7, color='k', fontsize=7):
 
 # ------------------------------------------------------------------ write ---
 class Writer(object):
-    """Emit HPGL in the same dialect TENSOR uses, so pyTENSOR output can be
+    """Emit HPGL in the same dialect TENSOR uses, so pyTECTOR output can be
     dropped into the same viewers and plotters as the originals."""
 
     #: Measured off the archive rather than guessed. In 0404-01/HPGL the centre
     #: cross sits at 2908, 3008 with arms of 204 units and the primitive circle
     #: has radius 2002; 204 / 2002 = 0.1019, which is the CROSS_ARM that plot.py
     #: measured independently. The previous defaults, 2500 and 2910, 3164, drew
-    #: the plot a quarter too large and 156 units too high, so pyTENSOR output
+    #: the plot a quarter too large and 156 units too high, so pyTECTOR output
     #: did not overlay the originals.
     SCALE = 2002.0
     ORIGIN = (2908, 3008)

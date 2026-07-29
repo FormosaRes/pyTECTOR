@@ -112,7 +112,7 @@ class TiltDialog(QtWidgets.QDialog):
             lambda i, k: (self.bar.setMaximum(k), self.bar.setValue(i)))
         self.worker.done.connect(self._finished)
         self.worker.failed.connect(
-            lambda m: QtWidgets.QMessageBox.critical(self, 'pyTENSOR', m))
+            lambda m: QtWidgets.QMessageBox.critical(self, 'pyTECTOR', m))
         self.worker.start()
 
     # ------------------------------------------------------------------

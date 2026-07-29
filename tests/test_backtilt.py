@@ -32,8 +32,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
 
-from pytensor import backtilt, core, rotate, tensorfile, tilt
-from pytensor.archive import ARCHIVE_ROOT as AROOT
+from pytector import backtilt, core, rotate, tensorfile, tilt
+from pytector.archive import ARCHIVE_ROOT as AROOT
 
 fails = []
 

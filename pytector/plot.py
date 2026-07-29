@@ -3,7 +3,7 @@
 
 The style is not inferred from the figure captions: it is copied from the HPGL
 files the original program wrote, which are plain-text plotter vectors and so
-record exactly what TENSOR drew. See pytensor.hpgl and render_hpgl.py.
+record exactly what TENSOR drew. See pytector.hpgl and render_hpgl.py.
 
 What the originals do:
 
@@ -105,7 +105,7 @@ LW = 0.9
 
 LABEL = (r'$\sigma_1$', r'$\sigma_2$', r'$\sigma_3$')
 
-PROGRAM_TAG = 'pyTENSOR'
+PROGRAM_TAG = 'pyTECTOR'
 
 #: Ink and paper for everything drawn here. The originals are black on white,
 #: which is the default. 1991 mode swaps in phosphor green on black; set these

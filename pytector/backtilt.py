@@ -232,7 +232,7 @@ class BackTiltWindow(QtWidgets.QDialog):
         self.cb_carry.toggled.connect(lambda _v: self._draw())
         row.addWidget(self.cb_carry)
         self.cb_flag = QtWidgets.QCheckBox('flag data')
-        self.cb_flag.setChecked(True)
+        self.cb_flag.setChecked(False)
         self.cb_flag.setToolTip(
             'Ring the faults that fit badly or that are holding the answer in '
             'place, and list them underneath. Leave-one-out, so "holding the '
@@ -276,6 +276,7 @@ class BackTiltWindow(QtWidgets.QDialog):
 
         self.fig = Figure(figsize=(11, 5.6), facecolor='white')
         self.canvas = Canvas(self.fig)
+        self.canvas.mpl_connect('resize_event', self._on_resize)
         holder = QtWidgets.QFrame()
         holder.setObjectName('plotpanel')
         hv = QtWidgets.QVBoxLayout(holder)
@@ -742,7 +743,7 @@ class BackTiltWindow(QtWidgets.QDialog):
             plot.plot_site(ax, n, s, raw, certainty=conf, sides=sides,
                            site_code=self.site_name,
                            reference=self.reference_now(False),
-                           declination=self.decl, axis_colours=True,
+                           declination=self.decl,
                            mark=[d['plot_mark'] for d in fraw] if fraw else None,
                            header='AS MEASURED  no rotation')
             if annotate and raw:
@@ -753,7 +754,7 @@ class BackTiltWindow(QtWidgets.QDialog):
             plot.plot_site(ax, rn, rs, rot, certainty=conf, sides=sides_rot,
                            site_code=self.site_name,
                            reference=self.reference_now(True),
-                           declination=self.decl, axis_colours=True,
+                           declination=self.decl,
                            mark=[d['plot_mark'] for d in frot] if frot else None,
                            header='BACK-TILTED' + tag)
             if raw and self.rot and self.cb_carry.isChecked():
@@ -761,40 +762,19 @@ class BackTiltWindow(QtWidgets.QDialog):
             if annotate and rot:
                 plot.annotate_result(ax, rot, n_data=len(self.records))
 
-        if not annotate and self.rot and self.cb_carry.isChecked():
-            self._legend()
         self.fig.subplots_adjust(left=0.02, right=0.98,
                                  top=0.99 if annotate else 0.90,
-                                 bottom=0.12 if annotate else 0.09,
+                                 bottom=0.06 if annotate else 0.03,
                                  wspace=0.02, hspace=0.28)
+        # after the layout, because it measures the panels
+        plot.fit_captions(self.fig)
         self.canvas.draw()
 
-    def _legend(self):
-        """Say what the marks mean instead of leaving them to be worked out.
-
-        The window was readable only once you already knew that the rings were
-        the measured axes carried through the rotation and the stars were the
-        re-inversion. That is the one thing it exists to show, so it is written
-        down, in the same colours as the marks themselves.
-        """
-        c = '#1E1E1C' if plot.PEN == 'k' else plot.PEN
-        self.fig.text(0.02, 0.028,
-                      'ring = measured axis carried through the rotation'
-                      '      → star = re-inverted from the rotated data'
-                      '      arrow labelled with the gap',
-                      fontsize=8.5, color=c, va='bottom')
-        x = 0.02
-        for i, nm in enumerate(('σ1', 'σ2', 'σ3')):
-            self.fig.text(x, 0.062, nm, fontsize=9, color=plot.axis_ink(i),
-                          va='bottom', fontweight='600')
-            x += 0.028
-        if self.cb_flag.isChecked():
-            self.fig.text(x + 0.02, 0.062,
-                          '◎ changes the answer   '
-                          '○ far outside the quality bands',
-                          fontsize=8.5,
-                          color=plot.MARK_INK if plot.PEN == 'k' else plot.PEN,
-                          va='bottom')
+    def _on_resize(self, _ev):
+        """The captions are sized to the panel, so they have to be resized
+        with it. Only the text changes, so there is no need to redraw the
+        stereograms."""
+        plot.fit_captions(self.fig)
 
     def save_hpgl(self):
         """The restored stereogram as HPGL, the format the original plotted in.

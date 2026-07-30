@@ -27,3 +27,14 @@ Session/*
 !Session/.gitkeep
 !Session/README.md
 *.tec
+
+# Scratch output from the research scripts. These name every site in the
+# reference archive, its folder layout and in one case a colleague's name, so
+# they are field data in all but format. Three of them had been committed and
+# had to be removed from history before this repository could be made public;
+# the patterns are here so it cannot happen again.
+audit_log.txt
+repro_log.txt
+tilt_out.txt
+*_log.txt
+screening*.txt

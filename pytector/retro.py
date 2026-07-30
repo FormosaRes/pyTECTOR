@@ -32,7 +32,11 @@ CYAN = '#00A8A8'
 WHITE = '#FFFFFF'
 SHADOW = '#545454'
 
-MONO = 'Consolas'       # stands in for a bitmap console face
+#: A stack, not one name: a missing family is silently substituted by Qt,
+#: and the substitute is proportional, which breaks the console look this
+#: mode exists for. Windows face first; the rest are macOS and Linux.
+MONO = ('"Consolas", "SF Mono", "Menlo", "DejaVu Sans Mono", '
+        '"Courier New", monospace')       # a bitmap console face
 
 #: the stereogram goes phosphor green on black, like the monitor it would have
 #: been drawn on before it reached the plotter
@@ -78,7 +82,7 @@ QSS = """
 QMainWindow, QWidget {{
     background: {DESK};
     color: {WHITE};
-    font-family: "{MONO}";
+    font-family: {MONO};
     font-size: 13px;
 }}
 /* A background on QWidget cascades into every QLabel, QCheckBox and
@@ -146,23 +150,23 @@ QLabel#heading {{
 }}
 QLabel#value, QLabel#axis {{
     color: {HILITE};
-    font-family: "{MONO}";
+    font-family: {MONO};
     font-size: 16px;
 }}
 QLabel#secondary {{ color: {CYAN}; font-size: 11px; }}
 QLabel#legend, QLabel#count {{ color: {CYAN}; font-size: 11px; }}
 QLabel#state {{
     color: {INK}; background: {HILITE};
-    font-family: "{MONO}"; font-size: 11px; font-weight: 600;
+    font-family: {MONO}; font-size: 11px; font-weight: 600;
     padding: 2px 8px; border: 0;
 }}
 QLabel#context {{
-    color: {WHITE}; font-family: "{MONO}"; font-size: 12px;
+    color: {WHITE}; font-family: {MONO}; font-size: 12px;
     font-weight: 600; padding: 2px 4px;
 }}
 QLabel#stale {{
     color: {WHITE}; background: #A80000;
-    font-family: "{MONO}"; font-size: 11px; font-weight: 600;
+    font-family: {MONO}; font-size: 11px; font-weight: 600;
     padding: 2px 8px; border: 0;
 }}
 QLabel#sitename {{ color: {HILITE}; }}
@@ -173,7 +177,7 @@ QLineEdit {{
     selection-background-color: {CYAN}; selection-color: {INK};
 }}
 QLineEdit:focus {{ border: 1px solid {HILITE}; }}
-QLineEdit#seg {{ font-family: "{MONO}"; font-size: 15px; }}
+QLineEdit#seg {{ font-family: {MONO}; font-size: 15px; }}
 /* Disabled fields were yellow-on-black turning to near-black-on-black. Grey on
    grey reads as switched off while staying legible, which is what a DOS
    dialog did with an inactive control. */
@@ -194,7 +198,7 @@ QToolBar QCheckBox {{ color: {INK}; }}
 QTableWidget, QListWidget {{
     background: {INK}; color: {CYAN}; border: 1px solid {SHADOW};
     border-radius: 0; gridline-color: {SHADOW};
-    font-family: "{MONO}"; font-size: 12px;
+    font-family: {MONO}; font-size: 12px;
 }}
 QTableWidget::item:selected, QListWidget::item:selected {{
     background: {CYAN}; color: {INK};
@@ -215,7 +219,7 @@ QTabBar::tab:selected {{ background: {PANEL}; color: {INK}; }}
 
 QPlainTextEdit {{ background: {INK}; color: {CYAN}; border: 0; }}
 QPlainTextEdit#report {{
-    font-family: "{MONO}"; font-size: 13px; padding: 6px 10px;
+    font-family: {MONO}; font-size: 13px; padding: 6px 10px;
     color: {HILITE};
 }}
 

@@ -14,21 +14,28 @@ The material is in three piles that have never been joined up.
       station names in the solution table.
 
 The join is the point. A run folder is NOT automatically the run whose numbers
-reached the thesis: site 0404-04C-1 holds 49.5/8.1, Phi 0.444, ANG 3.9, RUP
-23.1, while the adopted table records 48/11, 0.457, 6, 25. Those are different
-determinations of the same station. Until the two are matched, "the archive
-says" and "the thesis says" are not the same claim, and neither is traceable.
+reached the thesis: a folder can hold one determination while the adopted table
+records a different one for the same station, differing in axes, Phi, ANG and
+RUP. Until the two are matched, "the archive says" and "the thesis says" are
+not the same claim, and neither is traceable.
 
 So each adopted solution is matched back to the run that produced it by
 comparing the recorded 03 result line, and anything that fails to match is
 reported rather than quietly dropped.
 
-Output is written to a directory given on the command line (default
-F:\\古應力資料庫): a SQLite file for querying, plus a CSV of every table for
-Excel and for Dataview, plus a README recording what was matched and what was
-not. Nothing in the source folders is modified.
+Output is a SQLite file for querying, plus a CSV of every table for Excel and
+for Dataview, plus a README recording what was matched and what was not.
+Nothing in the source folders is modified.
 
     python research/build_database.py [outdir]
+
+Every input path comes from the environment, because they all point at
+unpublished field data and this file is public:
+
+    PYTECTOR_ARCHIVE     the TENSOR run folders
+    PYTECTOR_ADOPTED     CSV of the adopted solutions
+    PYTECTOR_LOCALITIES  CSV of locality coordinates
+    PYTECTOR_DB_OUT      where to write (or pass it as argv[1])
 """
 import csv
 import io
@@ -45,13 +52,23 @@ sys.path.insert(0, os.path.dirname(
 from pytector import core, plot, tensorfile          # noqa: E402
 from pytector.tensorfile import RAKE_OFFSET          # noqa: E402
 
-ARCHIVE = os.environ.get(
-    'PYTECTOR_ARCHIVE',
-    r'<PYTECTOR_ARCHIVE>')
-ADOPTED = r'<PYTECTOR_ADOPTED>'
-LOCALITIES = (r'<PYTECTOR_LOCALITIES_DIR>'
-              r'\localities 3.csv')
-OUTDIR = sys.argv[1] if len(sys.argv) > 1 else r'<PYTECTOR_DB_OUT>'
+def _need(var, what):
+    """A required path, from the environment. Not defaulted to a real location:
+    every one of these points at unpublished field data, and this file is
+    public."""
+    p = os.environ.get(var)
+    if not p:
+        raise SystemExit(
+            'set %s to %s.\nSee the module docstring for the full list; '
+            'none of them are defaulted, on purpose.' % (var, what))
+    return p
+
+
+ARCHIVE = _need('PYTECTOR_ARCHIVE', 'the folder holding the TENSOR run folders')
+ADOPTED = _need('PYTECTOR_ADOPTED', 'the CSV of adopted solutions')
+LOCALITIES = _need('PYTECTOR_LOCALITIES', 'the CSV of locality coordinates')
+OUTDIR = (sys.argv[1] if len(sys.argv) > 1
+          else _need('PYTECTOR_DB_OUT', 'the output directory'))
 
 #: folder names record the trial rotation, e.g. "0404-04C(backtilted 020 -20)"
 BACKTILT = re.compile(r'backtilt\w*\s*\(?\s*(\d{1,3})\s*[, ]\s*([+-]?\d{1,3})',
@@ -141,8 +158,8 @@ def collect_runs():
         folder = os.path.dirname(path)
         rel = os.path.relpath(folder, ARCHIVE)
         group = rel.split(os.sep)[0] if os.sep in rel else '(root)'
-        # a folder can hold more than one site file (Juisui/HY1 holds four), so
-        # the key has to be the file, not the folder
+        # a folder can hold more than one site file (in this archive one holds
+        # four), so the key has to be the file, not the folder
         run_id = os.path.relpath(path, ARCHIVE).replace(os.sep, '/')
 
         try:
@@ -278,8 +295,8 @@ def match_adopted(adopted, runs):
         # Independent of any archive: three principal axes are mutually
         # perpendicular, so the recorded triple has to be orthogonal to within
         # rounding. This catches a mistyped digit without needing to find the
-        # run at all. LY-11-2 is recorded as 210/69, 326/19, 060/18, and no
-        # orthogonal triple has those plunges: sin^2 sums to 1.073.
+        # run at all, and it did: one station in this data set sums sin^2 to
+        # 1.073 instead of 1, which no orthogonal triple can do.
         rec = dict(sol)
         if all(a[0] is not None for a in want):
             v = [core.vec_from_trend_plunge(*a) for a in want]

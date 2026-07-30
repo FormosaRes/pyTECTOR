@@ -23,6 +23,8 @@ during it, full restoration over-rotates them. So the window reports the
 Andersonian misfit before and after rather than assuming that flat bedding is
 the answer, and the tilt test sweeps partial restorations.
 """
+import os
+
 import numpy as np
 from PyQt5 import QtCore, QtWidgets
 
@@ -32,7 +34,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 
 from . import (core, diagnose, entry, hpgl, invdir, modern, penrec, plot,
-               rotate, tensorfile, tilt, tiltui)
+               report, rotate, tensorfile, tilt, tiltui)
 
 DEG = '°'
 PHI = 'Φ'
@@ -40,6 +42,10 @@ PHI = 'Φ'
 #: key, display name, one-line description
 METHODS = (('A', 'INVDIR', 'as TENSOR 5.45 runs it'),
            ('B', 'S4MIN', 'exact minimum of the same criterion'))
+
+#: the four-character code INFO1/MOHR1 print for each method, matching
+#: pyTECTOR.py's CODE
+CODE = {'A': 'INVD', 'B': 'S4MN'}
 
 
 def _run(key, n, s, n_pass):
@@ -301,13 +307,15 @@ class BackTiltWindow(QtWidgets.QDialog):
                      'four-field entry format, ready to paste into a new site.')
         b.clicked.connect(self._copy_data)
         brow.addWidget(b)
-        self.btn_adopt = QtWidgets.QPushButton('Show in main window')
-        self.btn_adopt.setToolTip(
-            'Add the back-tilted stereograms to the main figure, as a second '
-            'row under the measured ones. Nothing is replaced: the records and '
-            'the measured stereograms stay exactly as they are.')
-        self.btn_adopt.clicked.connect(self._adopt)
-        brow.addWidget(self.btn_adopt)
+        b = QtWidgets.QPushButton('Save INFO1')
+        b.setToolTip('Write the back-tilted solution as INFO1, in the same '
+                     'layout as the main window\'s Save INFO1.')
+        b.clicked.connect(lambda: self._save_report('INFO1'))
+        brow.addWidget(b)
+        b = QtWidgets.QPushButton('Save MOHR1')
+        b.setToolTip('Write the back-tilted solution as MOHR1.')
+        b.clicked.connect(lambda: self._save_report('MOHR1'))
+        brow.addWidget(b)
         lv.addLayout(brow)
 
         self.fig = Figure(figsize=(11, 5.6), facecolor='white')
@@ -349,6 +357,7 @@ class BackTiltWindow(QtWidgets.QDialog):
         self.records = [dict(r) for r in m.active] if m else []
         self.planes = [dict(p) for p in m.planes] if m else []
         self.site_name = getattr(m, 'site_name', '01') if m else '01'
+        self.site_code = getattr(m, 'site_code', '01') if m else '01'
         self.n_pass = m.sp_pass.value() if m else 1
         try:
             self.decl = float(m.ed_decl.text().strip())
@@ -896,28 +905,82 @@ class BackTiltWindow(QtWidgets.QDialog):
         self.sp_frac.setValue(100)
         self._changed()
 
-    def _adopt(self):
-        """Show the back-tilted result on the main figure, without disturbing
-        anything there.
+    # ------------------------------------------------------------ reports --
+    def _report_source(self):
+        for tag, _n, _d in METHODS:
+            r = self.results.get('rot_' + tag)
+            if r is not None:
+                return tag, r
+        return None, None
 
-        An earlier version replaced the main window's records with the rotated
-        ones. That was wrong: a tilt test is a comparison, and overwriting the
-        measured data destroys the half being compared against. The rotation
-        and the solutions go across; the data do not move.
-        """
-        if not self.rot or self.main is None:
+    def _info_kwargs(self):
+        """Everything info1_text needs, so the exported file describes the
+        back-tilted solution, not the as-measured one -- that one is the
+        main window's INFO1/MOHR1 tabs to export."""
+        tag, r = self._report_source()
+        if r is None:
+            return None, None
+        trace = r.get('lambda_trace') or []
+        site_file = self.site_name
+        if self.rot:
+            site_file = '%s %s' % (site_file, rotate.describe(*self.rot))
+        return r, dict(site_file=site_file, res=r, n_data=len(self.records),
+                       invdir=r.get('invdir_summary'),
+                       lam_invdir=trace[-1]['lam_printed'] if trace else None,
+                       pass_no=self.n_pass,
+                       site=getattr(self, 'site_code', '01'),
+                       method=CODE[tag])
+
+    def _diagnostics_text(self):
+        tag, r = self._report_source()
+        if r is None or len(self.records) < 6 or not self.rot:
+            return None
+        try:
+            n0, s0 = self.n_s
+            n, s = rotate.rotate_site(n0, s0, *self.rot)
+            solver = ((lambda a, b: invdir.run(
+                a, b, n_pass=self.n_pass)['T']) if tag == 'A'
+                else (lambda a, b: modern.run(a, b, n_starts=200)['T']))
+            rows = diagnose.combine(r, n, s, solver)
+            out = []
+            hot = [x for x in rows if x['flag']]
+            out.append('data worth checking: %d of %d'
+                       % (len(hot), len(rows)))
+            out.append('')
+            out.append(diagnose.text_table(rows))
+            d = diagnose.disclosure(rows, n, s, solver)
+            if d and d.get('trimmed') is not None:
+                out.append('')
+                out.append('IF THOSE WERE SET ASIDE')
+                out.append(diagnose.disclosure_text(d, rows))
+            return '\n'.join(out)
+        except Exception:
+            return None
+
+    def _save_report(self, which):
+        r, kw = self._info_kwargs()
+        if r is None:
             QtWidgets.QMessageBox.information(
-                self, 'pyTECTOR', 'Set a rotation first.')
+                self, 'pyTECTOR', 'Invert first: there is no back-tilted '
+                'result to save.')
             return
-        got = dict((k, self.results['rot_' + k]) for k, _n, _d in METHODS
-                   if ('rot_' + k) in self.results)
-        if not got:
-            QtWidgets.QMessageBox.information(
-                self, 'pyTECTOR', 'Invert first: there is no result to show.')
+        stem = (rotate.file_stem(self.site_name, *self.rot) if self.rot
+                else rotate.safe_name(self.site_name))
+        fn, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, 'Save ' + which, stem, 'All files (*)')
+        if not fn:
             return
-        self.main.show_backtilted(self.rot, got)
-        self.lbl_data.setText('shown on the main figure, %s'
-                              % rotate.describe(*self.rot))
+        if which == 'INFO1':
+            text = report.info1_text(full_header=True,
+                                     diagnostics=self._diagnostics_text(),
+                                     **kw)
+        else:
+            text = report.mohr1_text(r, len(self.records),
+                                     method=kw['method'], site=kw['site'])
+        with open(fn, 'w', newline='\n', encoding='ascii',
+                  errors='replace') as fh:
+            fh.write(text)
+        self.lbl_data.setText('saved ' + os.path.basename(fn))
 
     def _copy_data(self):
         recs = self.rotated_records()

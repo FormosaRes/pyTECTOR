@@ -11,6 +11,7 @@
 [![python](https://img.shields.io/badge/python-3.x-555)](#quick-start)
 [![tests](https://img.shields.io/badge/tests-11%20suites%20passing-2ea44f)](tests/)
 [![archive](https://img.shields.io/badge/archive-85%2F90%20runs%20reproduced-2ea44f)](tests/test_replication.py)
+[![licence](https://img.shields.io/badge/licence-MIT-8250df)](LICENSE)
 
 [使用手冊 中文](docs/manual.zh.md) · [English manual](docs/manual.en.md) · [原程式對話全文](docs/mesure_oracle.md) · [English below](#english)
 
@@ -709,26 +710,38 @@ tests/              regression against the archive
 research/           how every constant was measured, see its own README
 ```
 
-## Credits and use
+## Licence, credits and use
 
-The method is Jacques Angelier's. This is an independent reimplementation from
-his published papers, plus measurements taken from output files his program
-wrote; no code was taken from the original binary.
+The code in this repository is released under the **MIT Licence**; see
+[LICENSE](LICENSE). If it contributes to published work, a citation of this
+repository alongside Angelier's own papers is appreciated but not required.
 
-The opening screen is Angelier's own block diagram of the Taiwan arc-continent
-collision. He used earthquake focal mechanisms from near Yuli as the worked
-example of applying this method to seismological data (1994, fig. 4.44). That
-image is a published figure and is **not** committed here, so a fresh clone
-starts without an opening screen and without the easter egg behind it. Drop
-`Taiwan Tectonic Map.jpg` in the repository root to get both back.
+Three things the licence does not cover, because they are not this project's to
+license:
 
-Maintainer: Chi-Hsiu Pang. Licence not yet chosen; treat as all rights reserved
-until one is added.
+- **The method** is Jacques Angelier's, set out in the papers cited above. This
+  is an independent reimplementation from those papers, plus measurements taken
+  from output files his program wrote; no code was taken from the original
+  binary.
+- **The reference archive** is unpublished field data. It is not distributed
+  here and is not covered by this licence (see *The reference archive*).
+- **The opening screen** is Angelier's own block diagram of the Taiwan
+  arc-continent collision. He used earthquake focal mechanisms from near Yuli as
+  the worked example of applying this method to seismological data (1994,
+  fig. 4.44). That image is a published figure and is **not** committed here, so
+  a fresh clone starts without an opening screen and without the easter egg
+  behind it. Placing `Taiwan Tectonic Map.jpg` in the repository root restores
+  both, for local use only.
+
+Maintainer: Chi-Hsiu Pang.
 
 ## Changelog
 
 **0.3.0**
 
+- **released under the MIT Licence**, which settles the one item that had been
+  blocking public use (see *Licence, credits and use* for what the licence does
+  and does not cover)
 - renamed pyTENSOR → **pyTECTOR**, after Angelier's own data-base name, to
   stay clear of Delvaux's TENSOR / Win-Tensor and of PyMC's `pytensor`
   package (see *Why the name*). `PYTENSOR_ARCHIVE` still works as a legacy
@@ -771,7 +784,6 @@ until one is added.
 - R4DT / R4DS / R2DT / R2DS, Angelier's iterative-search methods,
   deliberately not started (TENSOR's own help documents them, see
   docs/mesure_oracle.md)
-- a licence
 
 ---
 
@@ -1259,6 +1271,8 @@ research/           各項常數的量測過程，該資料夾另有 README
 
 **0.3.0**
 
+- **以 MIT 授權釋出**，解決先前唯一阻礙公開使用的項目
+  （授權涵蓋與不涵蓋的範圍見「授權與致謝」）
 - 更名 pyTENSOR → **pyTECTOR**，取自 Angelier 自身的資料庫名稱，
   以避開 Delvaux 的 TENSOR／Win-Tensor 與 PyMC 的 `pytensor`
   （見「為什麼叫 pyTECTOR」）。環境變數 `PYTENSOR_ARCHIVE` 仍可使用，
@@ -1297,18 +1311,24 @@ research/           各項常數的量測過程，該資料夾另有 README
   見 [docs/mesure_oracle.md](docs/mesure_oracle.md)）
 - R4DT／R4DS／R2DT／R2DS 等 Angelier 的疊代搜尋法，刻意尚未著手
   （TENSOR 自身的說明文件有相關記載，見 docs/mesure_oracle.md）
-- 授權條款
 
 ## 授權與致謝
 
-方法為 Jacques Angelier 所提出。本專案係依其發表的論文，
-並輔以對其程式輸出檔案的量測所完成的獨立重寫，
-未自原執行檔取用任何程式碼。
+本 repo 的程式碼以 **MIT 授權**釋出，全文見 [LICENSE](LICENSE)。
+若本工具對已發表研究有所助益，歡迎在引用 Angelier 原始論文之外一併引用本 repo，
+但並非必要。
 
-開啟畫面採用 Angelier 繪製的台灣弧陸碰撞塊體圖。
-他以玉里附近的地震震源機制作為「將此方法應用於地震學資料」的示範案例
-（1994, fig. 4.44）。該圖為已發表的圖件，**未**納入本 repo，
-因此新 clone 的版本不會有開啟畫面，其後的彩蛋亦無法開啟。
-將 `Taiwan Tectonic Map.jpg` 置於專案根目錄即可恢復兩者。
+以下三項不在本授權範圍內，因為它們並非本專案所能授權的對象：
 
-維護者：Chi-Hsiu Pang。授權條款尚未選定，在正式加入之前請視為保留所有權利。
+- **方法本身**為 Jacques Angelier 所提出，載於前文所引論文。本專案係依其發表的
+  論文，並輔以對其程式輸出檔案的量測所完成的獨立重寫，未自原執行檔取用任何
+  程式碼。
+- **參考資料集**屬未發表的野外資料，未隨本 repo 發布，亦不在本授權範圍內
+  （見「參考資料集」一節）。
+- **開啟畫面**採用 Angelier 繪製的台灣弧陸碰撞塊體圖。他以玉里附近的地震震源
+  機制作為「將此方法應用於地震學資料」的示範案例（1994, fig. 4.44）。該圖為
+  已發表的圖件，**未**納入本 repo，因此新 clone 的版本不會有開啟畫面，
+  其後的彩蛋亦無法開啟。將 `Taiwan Tectonic Map.jpg` 置於專案根目錄即可恢復兩者，
+  僅限本機使用。
+
+維護者：Chi-Hsiu Pang。

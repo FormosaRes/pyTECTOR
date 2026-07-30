@@ -8,6 +8,16 @@ version = "0.3.0"
 description = "Python reconstruction of J. Angelier's TENSOR palaeostress inversion program (TENSOR 5.45, jan91)"
 readme = "README.md"
 requires-python = ">=3.8"
+# Table form rather than the PEP 639 SPDX string: that spelling needs
+# setuptools 77 or newer, and this builds against 61.
+license = { text = "MIT" }
+authors = [{ name = "Chi-Hsiu Pang" }]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+]
 dependencies = [
     "numpy",
     "scipy",

@@ -4,13 +4,12 @@
 
 **Angelier 古應力反演的 Python 重建版，對應 TENSOR 5.45 (jan91)**
 
-照論文重寫，不反譯執行檔；原程式 90 個 run 重現 85 個；回轉與 tilt test；逐筆影響力診斷；INFO1／MOHR1／HPGL 原格式輸出
+依已發表的方法重建，並以原程式自身的輸出檔案驗證
 
 [![TENSOR](https://img.shields.io/badge/TENSOR%205.45-reconstructed-1f6feb)](docs/mesure_oracle.md)
 [![version](https://img.shields.io/badge/version-0.3.0-brightgreen)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-3.x-555)](#quick-start)
 [![tests](https://img.shields.io/badge/tests-11%20suites%20passing-2ea44f)](tests/)
-[![archive](https://img.shields.io/badge/archive-85%2F90%20runs%20reproduced-2ea44f)](tests/test_replication.py)
 [![licence](https://img.shields.io/badge/licence-MIT-8250df)](LICENSE)
 
 [使用手冊 中文](docs/manual.zh.md) · [English manual](docs/manual.en.md) · [原程式對話全文](docs/mesure_oracle.md) · [English below](#english)
@@ -28,49 +27,57 @@ Angelier 的直接反演法從一組斷層面與擦痕線理，解出最能解�
 也就是三個主應力方向與形狀比 Φ。`Tensor.exe` 自 1991 年起執行這項計算，
 大量已發表的古應力研究皆建立在其結果之上。
 
-pyTECTOR 執行相同的運算、讀寫相同的檔案、繪製相同的圖，並補上原程式沒有的部分：
-**回轉（back-tilt）**、**tilt test**，以及**把同一個準則真正最小化**的第二種跑法，
-用來分辨一個答案有多少來自方法本身、多少來自資料。
+pyTECTOR 執行相同的運算、讀寫相同的檔案、繪製相同的圖，
+並補上原程式未提供的部分：回轉（back-tilting）、傾轉檢驗，
+以及將同一準則精確最小化的第二種跑法，
+用以評估一個結果有多少來自方法本身、多少來自資料。
 
-名稱取自 **TECTOR**，即 Angelier 為這套程式的構造方位資料庫所取的名稱，
-印在它產生的每一份 INFO1 上。
+專案名稱取自 TECTOR，即 Angelier 為這套程式的構造方位資料庫所取的名稱，
+見於它產生的每一份 INFO1。
 
 ---
 
-## 📸 長什麼樣
+## 介面
 
-| 兩種跑法並列 | 回轉與 tilt test |
+| 兩種跑法並列 | 回轉與傾轉檢驗 |
 |---|---|
 | ![methods](docs/img/methods.png) | ![back-tilt](docs/img/backtilt.png) |
 
 <div align="center"><img src="docs/img/mohr.png" width="420" alt="Mohr diagram"></div>
 
-> 以上圖片皆由 repo 內的公開 fixture `tests/fixtures/L12-2/` 產生，
-> 那是一個合成站點，不是野外資料，任何人 clone 這個 repo 都能重製出同一張圖。
+> 以上圖片均由本 repo 所含的公開 fixture `tests/fixtures/L12-2/` 產生。
+> 該站為合成資料而非野外資料，因此上述各圖皆可自行重製。
 
 ---
 
-## ✨ 核心特色
+## 功能
 
-- **照論文重寫，不反譯執行檔。** 演算法在 Angelier (1984, 1990) 已完整發表，
-  依論文重建比逆向那個 16 位元二進位快上一個量級。
-- **對原程式逐位驗證。** 以 archive 中 92 個 run 作為回歸測試集：前向量
-  （SIGMN／TAU／TAUST／RUP／ANG）逐筆吻合至檔案精度；以各站記錄的 pass 數與
-  LAMBDA 重跑後，**85/90 站三軸角度差小於 3°**。
-- **INVDIR／S4MIN 兩種跑法並列。** 前者是 Angelier 原方法、原程式的跑法，
-  後者是同一準則的精確最小值。兩者皆非「真應力」：υ 準則本身有系統性偏差，
-  即使餵入零雜訊的理想合成資料，仍與真實張量相差約 4°。並列是為了呈現差異
-  所在，而非在其中擇一。
-- **回轉與 tilt test，原程式沒有的功能。** 角度以拉桿試誤調整，σ₁σ₂σ₃ 即時重算。
-  對 INVDIR 而言，回轉前後軸的差距反映的是方法本身的性質而非地質意義
-  （14 組 archive 配對，實測中位數 σ₁ 差 10.4°）。
-- **逐筆影響力診斷。** 「擬合誤差大」與「決定了答案」是兩件不同的事。程式做
-  leave-one-out 重新反演，並提供**剔除後殘差** ANG\*／RUP\*，同時把「全部資料」
-  與「剔除後」兩個答案並列寫進匯出的 INFO1。
-- **原格式輸出。** INFO1／MOHR1 與原始檔案逐位元組相同；HPGL 匯出是重播原本的
-  繪圖程式本身，而非另一套獨立實作。
-- **Session 存檔。** 全部工作狀態存成單一 JSON；只保存張量，其餘數值於載入時
-  重新計算，因此存檔中的 Φ 不可能與存檔中的張量互相矛盾。
+**重建方式。** 演算法已完整發表於 Angelier (1984, 1990)，因此本專案依論文實作，
+未對原始的 16 位元執行檔進行反組譯。
+
+**驗證。** 以原程式產生的 92 個 run 作為回歸測試集。前向量
+（SIGMN、TAU、TAUST、RUP、ANG）逐筆吻合至檔案本身的精度；
+依各站記錄的 pass 數與 LAMBDA 重新執行反演後，
+90 個可比對的站中有 85 站的三軸角度差在 3° 以內。
+
+**INVDIR 與 S4MIN 兩種跑法。** 前者為 Angelier 原方法、亦即原程式的跑法；
+後者為同一準則的精確最小值。兩者皆不應視為「真實應力」：
+υ 準則本身帶有系統性偏差，即使餵入零雜訊的理想合成資料，
+結果仍與真實張量相差約 4°。並列呈現的目的在於顯示差異所在，而非在其中擇一。
+
+**回轉與傾轉檢驗。** 此為原程式未提供的功能。旋轉角度以拉桿調整，
+σ₁、σ₂、σ₃ 即時重算。就 INVDIR 而言，回轉前後主軸的差距反映的是方法本身的性質
+而非地質意義（14 組 archive 配對，實測 σ₁ 差異中位數為 10.4°）。
+
+**影響力診斷。** 擬合殘差大的資料與實際主導結果的資料未必是同一批。
+程式對每一筆資料執行 leave-one-out 重新反演，輸出剔除後殘差 ANG\* 與 RUP\*，
+並將「全部資料」與「剔除該筆後」兩組結果並列寫入匯出的 INFO1。
+
+**原格式輸出。** INFO1 與 MOHR1 與原始檔案逐位元組相同；
+HPGL 匯出係重播原本的繪圖程序，而非另一套獨立實作。
+
+**Session 存檔。** 全部工作狀態存為單一 JSON 檔。檔中僅保存張量，
+其餘數值於載入時重新計算，因此存檔中的 Φ 不可能與存檔中的張量互相矛盾。
 
 ---
 

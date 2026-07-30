@@ -36,9 +36,12 @@ FORMAT = 1
 
 EXT = '.tec'
 
-#: the fields of a record that were typed rather than derived
+#: the fields of a record that were typed rather than derived. 'tail' is the
+#: reconstructed-or-archive annotation text that fills the sidebar's "as
+#: typed" column; it was left out once, and a session round-trip silently
+#: blanked that column even though nothing else about the record changed.
 RECORD_KEYS = ('code', 'dipaz', 'dip', 'rake', 'confidence', 'sense', 'raw',
-               'use', 'weight')
+               'use', 'weight', 'tail')
 
 
 def _clean(rec):

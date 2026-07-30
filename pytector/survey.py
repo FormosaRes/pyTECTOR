@@ -49,18 +49,46 @@ import csv
 import io
 import json
 import os
+import re
 from collections import OrderedDict, defaultdict
 
 from . import rose, tensorfile
 
 AUX = {'INFO1', 'MOHR1', 'PLOT1', 'HPGL', 'INFO2', 'MOHR2', 'PLOT2'}
 
+#: The suite's output files are extension-less too, and it numbers them when a
+#: previous one exists: INFO1, INFO2, PLOT1, PLOT12. Matching a fixed set is
+#: therefore not enough. Getting this wrong is silent and expensive: a build
+#: whose exclusion list stopped at the "1" names read INFO2, MOHR2, PLOT2 and
+#: PLOT12 as though they were fault data, and reported 103 runs where the
+#: archive holds 92. Four of the eleven even carried a Phi, because a MOHR file
+#: opens with an 02 line and ends with the 03 result line, so the site reader
+#: found something that looked like a solution.
+_OUTPUT = re.compile(r'^(INFO|MOHR|PLOT|HPGL|DESSIN|TRA|VISION)\d*$', re.I)
+
 
 def _site_file(folder, filenames):
+    """The one fault-data file in a run folder, or None.
+
+    A site file has no extension and is not one of the suite's own outputs.
+    """
     for fn in sorted(filenames):
-        if fn not in AUX and '.' not in fn:
-            return os.path.join(folder, fn)
+        if '.' in fn or fn in AUX or _OUTPUT.match(fn):
+            continue
+        return os.path.join(folder, fn)
     return None
+
+
+def _num(value):
+    """A float, or None. Blank cells, None and unparseable text all become
+    None, so callers need one guard instead of three. Real archives contain
+    all three cases; a one-run fixture contains none of them."""
+    if value is None or value == '':
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def collect(root, method='auto'):
@@ -127,10 +155,12 @@ def collect(root, method='auto'):
 
         if chosen is None:
             rec['solution_from'] = 'none'
+            rec['_records'] = site.records
             recs.append(rec)
             continue
 
         rec['solution_from'] = source
+        rec['_records'] = site.records
         for i in (1, 2, 3):
             tp = chosen.get('sigma%d' % i)
             rec['s%d_trend' % i] = round(tp[0], 1) if tp else ''
@@ -160,8 +190,9 @@ def _horizontal(rec):
     """Which axis is the shallowest, and is its trend usable as a direction."""
     best = None
     for i in (1, 2, 3):
-        t, p = rec.get('s%d_trend' % i), rec.get('s%d_plunge' % i)
-        if t == '' or p == '':
+        t = _num(rec.get('s%d_trend' % i))
+        p = _num(rec.get('s%d_plunge' % i))
+        if t is None or p is None:
             continue
         if best is None or p < best[1]:
             best = (i, p, t)
@@ -270,6 +301,62 @@ def write_table(recs, outdir):
             newline='\n').write('\n'.join(L) + '\n')
 
 
+FAULT_COLS = OrderedDict([
+    ('run_id', 'run'), ('site_name', 'site'), ('stage', 'phase'),
+    ('idx', 'no'), ('code', 'code'), ('confidence', 'conf'),
+    ('sense', 'sense'), ('strike', 'strike'), ('dip', 'dip'),
+    ('dipaz', 'dip az'), ('rake', 'rake'),
+    ('as_typed', 'as typed'),
+])
+
+
+def write_faults(recs, outdir):
+    """One row per fault datum, across every run.
+
+    This is the other half of what the archive holds: the solutions say what
+    the stress was, these say what was measured. Strike is given as well as
+    dip azimuth because the field convention is strike and the file stores dip
+    azimuth, and mixing those up rotates every plane by 90 degrees.
+
+    `rake` is as stored, which is TENSOR's convention; the movement direction
+    is rake + 180 (see tensorfile.RAKE_OFFSET). Left as stored rather than
+    silently converted, so the column means the same thing as the file.
+
+    There is deliberately no computed dip-quadrant letter. The letter is not
+    unique: for strike 115 both W and S resolve to dip azimuth 205, so a
+    canonical one disagreed with what the observer wrote on 80 of 800 archive
+    data while describing the same plane. `dipaz` is unambiguous and
+    `as_typed` preserves the original notation; a third, differently derived
+    letter would only invite the confusion it caused here.
+    """
+    rows = []
+    for r in recs:
+        for i, d in enumerate(r.get('_records') or [], start=1):
+            dipaz = d.get('dipaz')
+            rows.append({
+                'run_id': r['run_id'], 'site_name': r['site_name'],
+                'stage': r.get('stage', ''), 'idx': i,
+                'code': d.get('code', ''),
+                'confidence': d.get('confidence', ''),
+                'sense': d.get('sense', d.get('movement', '')),
+                'strike': ('%03.0f' % ((dipaz - 90.0) % 360.0)
+                           if dipaz is not None else ''),
+                'dip': d.get('dip', ''),
+                'dipaz': dipaz if dipaz is not None else '',
+                'rake': (round(d['rake'], 1) if d.get('rake') is not None
+                         else ''),
+                'as_typed': (d.get('tail') or '').strip(),
+            })
+    keys = list(FAULT_COLS)
+    with io.open(os.path.join(outdir, 'faults.csv'), 'w', encoding='utf-8',
+                 newline='') as fh:
+        w = csv.DictWriter(fh, fieldnames=keys, extrasaction='ignore')
+        w.writeheader()
+        for row in rows:
+            w.writerow({k: row.get(k, '') for k in keys})
+    return rows
+
+
 def write_map(recs, outdir):
     """CSV and GeoJSON of the runs that have coordinates."""
     mapped, missing = [], []
@@ -287,9 +374,8 @@ def write_map(recs, outdir):
 
     feats = []
     for r in mapped:
-        try:
-            lon, lat = float(r['longitude']), float(r['latitude'])
-        except (TypeError, ValueError):
+        lon, lat = _num(r.get('longitude')), _num(r.get('latitude'))
+        if lon is None or lat is None:
             continue
         feats.append(dict(type='Feature',
                           geometry=dict(type='Point',
@@ -327,9 +413,10 @@ def write_roses(recs, outdir, bin_deg=10.0):
         for i, label in ((1, 'sigma1  compression'), (3, 'sigma3  extension')):
             pairs = []
             for r in items:
-                t, p = r.get('s%d_trend' % i), r.get('s%d_plunge' % i)
-                if t != '' and p != '':
-                    pairs.append((float(t), float(p)))
+                t = _num(r.get('s%d_trend' % i))
+                p = _num(r.get('s%d_plunge' % i))
+                if t is not None and p is not None:
+                    pairs.append((t, p))
             groups[label] = pairs
         read = rose.pick_readable(groups)
 
@@ -370,10 +457,13 @@ def write_roses(recs, outdir, bin_deg=10.0):
 def write_all(recs, outdir, bin_deg=10.0):
     os.makedirs(outdir, exist_ok=True)
     write_table(recs, outdir)
+    faults = write_faults(recs, outdir)
     mapped, missing = write_map(recs, outdir)
     figs = write_roses(recs, outdir, bin_deg)
     print('\n%d runs -> %s' % (len(recs), outdir))
-    print('  survey.csv / survey.md')
+    print('  survey.csv / survey.md          one row per run')
+    print('  faults.csv                     %d fault data across all runs'
+          % len(faults))
     print('  map_points.csv / map_points.geojson   %d with coordinates, '
           '%d without' % (len(mapped), len(missing)))
     print('  %d rose figure(s) + roses.md' % len(figs))

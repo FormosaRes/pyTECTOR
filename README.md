@@ -145,10 +145,28 @@ PyQt5, and puts a pyTECTOR shortcut on the desktop. Alternatively
 installs a `pytector` command.
 
 ```
-pyTECTOR.bat                           desktop interface
+pyTECTOR.bat                           desktop interface (Windows)
+./pyTECTOR.command                     desktop interface (macOS, Linux)
 python demo_report.py [site file]      invert an old site, print INFO1 + MOHR1
 python run_batch.py [root] [out.csv]   both runs over a whole folder tree
 ```
+
+**macOS and Linux.** Nothing in the library is Windows-specific, so the
+inversion, the file readers and the exports all run unchanged. Install the four
+dependencies and use `pyTECTOR.command`, which is double-clickable in Finder:
+
+```
+python3 -m pip install numpy scipy matplotlib PyQt5
+./pyTECTOR.command
+```
+
+Two things to know. On an **Apple Silicon** Mac, PyQt5 needs a release with an
+arm64 wheel (5.15.10 or newer); if pip starts compiling Qt from source, install
+it through conda instead (`conda install -c conda-forge pyqt`). And set
+`PYTECTOR_PYTHON` if the launcher should use a particular interpreter rather
+than the first one on `PATH` that can import PyQt5. The interface has not been
+tested on macOS: the font stacks name macOS and Linux faces so the fixed-width
+tables stay aligned, but reports of anything that looks wrong are welcome.
 
 The full interface walkthrough, control by control, is in
 **[docs/manual.en.md](docs/manual.en.md)**.
@@ -679,7 +697,8 @@ Tests and the derivation scripts read real output from the original program.
 That is unpublished field data, so its location is not baked into the source:
 
 ```
-set PYTECTOR_ARCHIVE=<folder holding the TENSOR run folders>
+set PYTECTOR_ARCHIVE=<folder holding the TENSOR run folders>     REM Windows
+export PYTECTOR_ARCHIVE=<folder holding the TENSOR run folders>  # macOS, Linux
 ```
 
 Without it, those tests skip rather than fail. The data itself is not
@@ -838,10 +857,27 @@ Windows 一鍵安裝：下載整個 repo 後雙擊 **`install.bat`**。
 安裝後會提供 `pytector` 指令。
 
 ```
-pyTECTOR.bat                           桌面介面
+pyTECTOR.bat                           桌面介面（Windows）
+./pyTECTOR.command                     桌面介面（macOS、Linux）
 python demo_report.py [站檔]           反演一個舊站，印出 INFO1 + MOHR1
 python run_batch.py [根目錄] [out.csv] 對整棵資料夾跑兩種方法
 ```
+
+**macOS 與 Linux。** 函式庫本身沒有任何 Windows 專屬程式碼，
+因此反演、檔案讀取與各項匯出均可直接執行。安裝四個相依套件後，
+使用 `pyTECTOR.command` 啟動（在 Finder 中可直接雙擊）：
+
+```
+python3 -m pip install numpy scipy matplotlib PyQt5
+./pyTECTOR.command
+```
+
+兩點須注意。在 **Apple Silicon** 的 Mac 上，PyQt5 需使用具備 arm64 wheel 的版本
+（5.15.10 或更新）；若 pip 開始從原始碼編譯 Qt，請改以 conda 安裝
+（`conda install -c conda-forge pyqt`）。另外，若需指定特定的 Python 解譯器，
+可設定 `PYTECTOR_PYTHON`，否則啟動器會採用 `PATH` 上第一個能匯入 PyQt5 的解譯器。
+介面尚未在 macOS 上實際測試：字體堆疊已納入 macOS 與 Linux 的字型以維持
+定寬表格的對齊，若發現顯示異常歡迎回報。
 
 逐項功能的完整操作說明見 **[docs/manual.zh.md](docs/manual.zh.md)**。
 
@@ -1237,7 +1273,8 @@ L12（六個近平行、近垂直的面）為簡併站點，重現程度較為�
 因此路徑不寫入原始碼中：
 
 ```
-set PYTECTOR_ARCHIVE=<放 TENSOR run 資料夾的那個目錄>
+set PYTECTOR_ARCHIVE=<放 TENSOR run 資料夾的那個目錄>     REM Windows
+export PYTECTOR_ARCHIVE=<放 TENSOR run 資料夾的那個目錄>  # macOS、Linux
 ```
 
 未設定時測試會 skip，不會 fail。資料本身不隨本 repo 發布。

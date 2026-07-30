@@ -25,14 +25,22 @@ ACCENT = '#23324A'
 ACCENT_HI = '#31465F'
 WARN = '#8A5A00'
 
-FONT = 'Segoe UI'
-MONO = 'Consolas'
+#: Font stacks rather than single names, because a missing family is not an
+#: error in Qt: it silently substitutes, and for MONO that substitute is
+#: proportional, which knocks every numeric column out of alignment. Windows
+#: faces come first so nothing changes there; the macOS and Linux faces are
+#: the fallbacks. Used unquoted in the QSS below, so each name carries its own
+#: quotes and the list ends in a generic family.
+FONT = ('"Segoe UI", "SF Pro Text", "Helvetica Neue", "Noto Sans", '
+        'sans-serif')
+MONO = ('"Consolas", "SF Mono", "Menlo", "DejaVu Sans Mono", '
+        '"Courier New", monospace')
 
 QSS = """
 QMainWindow, QWidget {{
     background: {BG};
     color: {INK};
-    font-family: "{FONT}";
+    font-family: {FONT};
     font-size: 12px;
 }}
 
@@ -102,24 +110,24 @@ QLabel#heading {{
 }}
 QLabel#value {{
     color: {INK};
-    font-family: "{MONO}";
+    font-family: {MONO};
     font-size: 17px;
 }}
 QLabel#axis {{
     color: {INK};
-    font-family: "{MONO}";
+    font-family: {MONO};
     font-size: 16px;
 }}
 QLabel#secondary {{
     color: {MUTED};
-    font-family: "{MONO}";
+    font-family: {MONO};
     font-size: 11px;
 }}
 QLabel#legend {{ color: {MUTED}; font-size: 11px; }}
 /* the line that says what the data are; always present above the plot */
 QLabel#context {{
     color: {INK};
-    font-family: "{MONO}";
+    font-family: {MONO};
     font-size: 12px;
     font-weight: 600;
     padding: 2px 4px;
@@ -136,7 +144,7 @@ QLabel#stale {{
 /* the banner saying which state is on screen; loud on purpose */
 QLabel#state {{
     color: {WARN};
-    font-family: "{MONO}";
+    font-family: {MONO};
     font-size: 11px;
     font-weight: 600;
     padding: 2px 8px;
@@ -156,7 +164,7 @@ QLineEdit {{
 }}
 QLineEdit:focus {{ border: 1px solid {ACCENT}; }}
 QLineEdit#seg {{
-    font-family: "{MONO}";
+    font-family: {MONO};
     font-size: 15px;
     padding: 5px 2px;
 }}
@@ -166,7 +174,7 @@ QTableWidget {{
     border: 1px solid {LINE};
     border-radius: 4px;
     gridline-color: {BG};
-    font-family: "{MONO}";
+    font-family: {MONO};
     font-size: 11px;
 }}
 QTableWidget::item {{ padding: 2px 4px; }}
@@ -240,7 +248,7 @@ QPlainTextEdit {{
    the global "QMainWindow, QWidget" rule above would otherwise win and
    silently render the fixed-width tables in a proportional face. */
 QPlainTextEdit#report {{
-    font-family: "{MONO}", "Courier New", monospace;
+    font-family: {MONO};
     font-size: 12px;
     padding: 8px 12px;
 }}

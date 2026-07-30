@@ -19,6 +19,13 @@ build/
 dist/
 *.rar
 
+# Angelier's own executables. They are not ours to redistribute and must never
+# reach this repository, which is public: the 2008 workshop distribution is
+# unpacked here during development so the embedded FORMAT strings can be read,
+# and an unguarded `git add -A` would otherwise commit it.
+*.exe
+20080409-workshop/
+
 # field data: sessions and saved sites are the user's own measurements and do
 # not belong in a code repository, private or not. The FOLDER is tracked, via
 # its .gitkeep, so a fresh clone has somewhere to put them; the contents are

@@ -31,8 +31,29 @@ files rather than guessed from figure captions.
   two-segment slender head. Which side the offset and barbs sit is
   `sign(slip · strike)`, right on all 89 samples; reading it off the movement
   letter is right on only 83.
-- **Heavy arrows** outside the circle, inward along σ₁ and outward along σ₃,
-  omitted for an axis plunging more than 45°.
+- **Heavy arrows** outside the circle, inward along σ₁ and outward along σ₃.
+  **These were never computed from the tensor.** DIAGRA's own help lists them
+  under `SPECIAL CODES`, where 81 and 82 are a large black compression and
+  extension pair and 83-88 the small and open variants, and once a code is
+  chosen it asks
+
+  ```
+  AZIMUTH OF ARROWS [0-360] ? :
+  ```
+
+  so the direction was typed in by hand, one arrow at a time, until `0` ended
+  the loop. On CH-01a the σ₃ pair lands within 0.3° of the solution while the
+  σ₁ pair is 3.5° off in opposite senses, which is someone reading integers off
+  INFO1 rather than a computed value.
+
+  An archive plate may therefore carry both pairs, one, or none, whatever its
+  tensor. Drawing them from σ₁ and σ₃ and omitting an axis plunging more than
+  45° is a convenience this reconstruction adds; it reproduces 85 of the 90
+  archive runs. The five it does not are runs where no arrow was entered at all
+  (QS0711-1, 0406-7A, one back-tilted 0404-04C) or only one pair was (LL-3b,
+  CH-01e), and no geometric rule separates them: QS0216-14 draws its σ₃ pair at
+  plunge 36.5° while QS0711-1, at 35.4° with every axis within 2.3° of it, draws
+  nothing. The **Arrows** checkbox turns them off to match such a plate.
 - **The frame box is not symmetric about the centre of the stereogram.** All 93
   archive HPGL files put it at x −1.2527 to 1.2547 and y −1.3047 to 1.4585, in
   units of the primitive radius, and set every caption left aligned at a fixed

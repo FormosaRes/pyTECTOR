@@ -446,6 +446,20 @@ class Main(QtWidgets.QMainWindow):
             'slip runs against the solution; off by default.')
         self.cb_fit.toggled.connect(lambda _v: self._draw())
         tb.addWidget(self.cb_fit)
+        self.cb_arrows = QtWidgets.QCheckBox('Arrows')
+        self.cb_arrows.setChecked(True)
+        self.cb_arrows.setToolTip(
+            'The heavy compression and extension arrows outside the circle.\n\n'
+            'In the original these were NOT computed: DIAGRA lists them under '
+            '"SPECIAL CODES" and asks "AZIMUTH OF ARROWS [0-360] ?", so '
+            'whoever made the plate typed each direction in by hand. An '
+            'archive plate can therefore carry both pairs, one, or none, '
+            'whatever its tensor.\n\n'
+            'Drawing them from sigma1 and sigma3 reproduces 85 of the 90 '
+            'archive runs. Turn this off to match one of the five that carry '
+            'no arrows, such as QS0711-1.')
+        self.cb_arrows.toggled.connect(lambda _v: self._draw())
+        tb.addWidget(self.cb_arrows)
         lab = QtWidgets.QLabel('  INVDIR pass ')
         lab.setStyleSheet('color:%s;' % MUTED)
         tb.addWidget(lab)
@@ -1268,7 +1282,8 @@ class Main(QtWidgets.QMainWindow):
                 plot.plot_site(ax, n, s, r, certainty=conf, sides=sides,
                                site_code=self.site_name,
                                reference=self.reference_now(),
-                               declination=decl, header=NAME[k])
+                               declination=decl, header=NAME[k],
+                               arrows=self.cb_arrows.isChecked())
                 if annotate:
                     plot.annotate_result(ax, r, n_data=len(self.active))
             if want_fit:
@@ -1490,7 +1505,7 @@ class Main(QtWidgets.QMainWindow):
             base = act.property('en') or act.text()
             act.setProperty('en', base)
             act.setText(retro.translate(base) if self.retro else base)
-        for cb in (self.cb_fit,):
+        for cb in (self.cb_fit, self.cb_arrows):
             base = cb.property('en') or cb.text()
             cb.setProperty('en', base)
             cb.setText(retro.translate(base) if self.retro else base)
@@ -1529,7 +1544,8 @@ class Main(QtWidgets.QMainWindow):
         plot.plot_site(rec, n, s, r, certainty=self.confidence,
                        sides=self.sides, site_code=self.site_name,
                        reference=self.reference_now(), declination=decl,
-                       header=NAME.get(tag, 'observed'))
+                       header=NAME.get(tag, 'observed'),
+                       arrows=self.cb_arrows.isChecked())
         rec.emit(hpgl.Writer()).save(fn)
         self.status.showMessage('saved %s   %d vectors'
                                 % (fn, len(rec.polylines)))

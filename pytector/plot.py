@@ -316,10 +316,31 @@ def strike_slip_sign_vectors(n, s):
     return np.where(np.einsum('ki,ki->k', si, strike) >= 0, 1.0, -1.0)
 
 
-#: an axis only gets its heavy arrow pair if it is shallow enough for a
+#: An axis only gets its heavy arrow pair if it is shallow enough for a
 #: horizontal direction to mean anything. Checked against the originals:
 #: L12 draws both pairs (sigma1 36 deg, sigma3 44 deg), 0406-7 draws only the
 #: extension pair (sigma1 68 deg is too steep, sigma3 19 deg is fine).
+#:
+#: ⚠️ This threshold describes what the ARCHIVE'S OPERATOR did, not what the
+#: original program computed. DIAGRA never derived these arrows from the
+#: tensor: its own help lists them under "SPECIAL CODES", where 81/82 are a
+#: large black compression/extension pair and 85-88 the open and small
+#: variants, and having chosen a code it asks
+#:
+#:     AZIMUTH OF ARROWS [0-360] ? :
+#:
+#: so the direction was typed in by hand, one arrow at a time, until 0 ended
+#: the loop. Measured on CH-01a the sigma3 pair lands within 0.3 deg of the
+#: solution but the sigma1 pair is 3.5 deg off in opposite senses, which is
+#: someone reading integers off INFO1 rather than a computed value.
+#:
+#: Drawing them from sigma1 and sigma3 is therefore a convenience this
+#: reconstruction adds, and it reproduces 85 of the archive's 90 runs. The
+#: five it does not are runs where no arrow was entered at all (QS0711-1,
+#: 0406-7A, one back-tilted 0404-04C) or only one pair was (LL-3b, CH-01e).
+#: No geometric rule separates them: QS0716-14 draws its sigma3 pair at
+#: plunge 36.5 while QS0711-1, at 35.4 with every axis within 2.3 deg of it,
+#: draws nothing. Pass arrows=False to leave them off and match such a run.
 ARROW_PLUNGE_LIMIT = 45.0
 
 
@@ -421,7 +442,7 @@ def _regime_arrows(ax, result):
 def plot_site(ax, n, s, result=None, certainty=None, sides=None,
               declination=None, site_code=None, header=None,
               program=PROGRAM_TAG, show_axes=True, box=True,
-              reference=None, axis_colours=False, mark=None):
+              reference=None, axis_colours=False, mark=None, arrows=True):
     """Angelier-style stereogram of a fault-slip data set.
 
     certainty  per-datum 'C' / 'P' / 'S'; defaults to 'C'
@@ -435,6 +456,11 @@ def plot_site(ax, n, s, result=None, certainty=None, sides=None,
     mark       per-datum flag string from diagnose.combine, '' / '!' / '!!'.
                Rings the striae of the data worth looking at, so "which one
                was that" does not mean counting rows in a table.
+    arrows     the heavy compression and extension arrows outside the circle.
+               In the original these were typed in by hand, not computed, so
+               a given archive plate may carry both pairs, one, or none
+               regardless of its tensor; see ARROW_PLUNGE_LIMIT. Drawing them
+               from sigma1 and sigma3 reproduces 85 of the 90 archive runs.
     """
     draw_frame(ax, declination=declination, box=box)
     n = np.atleast_2d(np.asarray(n, float))
@@ -487,7 +513,8 @@ def plot_site(ax, n, s, result=None, certainty=None, sides=None,
             X, Y = schmidt(v[None, :])
             _draw_star(ax, float(X[0]), float(Y[0]), i, float(sizes[i]),
                        colour=axis_ink(i) if axis_colours else None)
-        _regime_arrows(ax, result)
+        if arrows:
+            _regime_arrows(ax, result)
 
     if site_code:
         ax.text(SITE_X, SITE_Y, str(site_code), ha='left', va='center',

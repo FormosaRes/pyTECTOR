@@ -333,6 +333,91 @@ foliation, metamorphic lineation, "non-faults". Diagram diameter is asked
 in centimetres — the fixture's 10 gives the 2002-unit radius at 400
 HPGL units per cm.
 
+# DIAGRA 5.39 run as an oracle (2026-07-30)
+
+`Diagra.exe` was run on the XP machine against the fixture site `L12-2`, site
+`01`, and the whole dialogue photographed. It settles where the heavy stress
+arrows come from, which the HPGL files alone could not.
+
+## The composition menu, in full
+
+Answering `100` at the first TYPE prompt prints the authoritative table:
+
+```
+CODES TO BE USED TO DEFINE STRUCTURES [0=END] :
+  1=FAULTS, 2=STRIAE, 3=B-AXES, 4=P-AXES, 5=T-AXES,
+  6=FRACTURE JOINTS, 7=BEDDING, 8=TENSION CRACKS,
+  9=STYLOLITIC JOINTS, 10=FRACTURE CLEAVAGE,
+  11=FOLD AXES, 12=TENSION FIBERS, 13=STYLOLITES OR
+  IMPACT AXES, 14=ALL METAMORPHIC CLEAVAGES,
+  15=METAMORPHIC LINEATIONS, 16=NON-FAULTS.
+(to project planes instead of poles, use sign - !)
+
+CODES FOR SEARCHING RESULTS [0=END] :
+-> PALEOSTRESS AXES :
+   31=INVD, 32=R4DT, 33=R4DS, 34=R2DT, 35=R2DS, 36=DIPT
+-> MEAN AXIS (AM) OR MEAN PLANE (PM) :
+   add 40 to corresponding structure code (41-55)
+-> REVOLUTION AXIS (AR) OR REVOLUTION PLANE (PR) :
+   add 60 to corresponding structure code (61-75)
+(to project planes instead of poles, use sign - !)
+
+SPECIAL CODES [0=END] :
+-> BLACK ARROWS : -large : 81=COMPR., 82=EXT. ;
+                  -small : 83=COMPR., 84=EXT. ;
+-> OPEN ARROWS  : -large : 85=COMPR., 86=EXT. ;
+                  -small : 87=COMPR., 88=EXT. .
+```
+
+## What this settles
+
+**The heavy arrows are an operator annotation, not a computed result.** They
+are `SPECIAL CODES`, entered at the same TYPE prompt as everything else, and
+choosing one makes DIAGRA ask
+
+```
+AZIMUTH OF ARROWS [0-360] ? :
+```
+
+so the direction is typed in by hand, one arrow at a time, until `0` ends the
+loop. Nothing ties an arrow to σ₁ or σ₃ except the operator's own reading of
+INFO1. Measured on CH-01a's plate the σ₃ pair lands within 0.3° of the
+solution while the σ₁ pair is 3.5° off in opposite senses, which is what
+typing integers off a printout looks like.
+
+This explains the five archive runs whose arrows do not follow from their
+tensors: QS0711-1, 0406-7A and one back-tilted 0404-04C carry none at all,
+LL-3b and CH-01e carry one pair where two would be expected. No geometric rule
+separates them from the rest, and QS0216-14 proves none can: it draws its σ₃
+pair at plunge 36.5° while QS0711-1, at 35.4° with all three axes within 2.3°
+of it, draws nothing. pyTECTOR's `ARROW_PLUNGE_LIMIT` therefore describes a
+habit of whoever made the plates, not an algorithm, and the interface carries
+an **Arrows** switch so a plate without them can be reproduced.
+
+**The stress axes are themselves an opt-in type.** `31=INVD` sits under
+"codes for searching results", so the stars are plotted only when 31 is
+entered. Choosing it makes DIAGRA ask
+
+```
+REFERENCE NUMBER OF RESULT TO BE PLOTTED ?
+[options: 0=last acceptable one, 999=first acceptable] :
+```
+
+which is the plot-side counterpart of a site file holding more than one `03`
+line: the operator chooses which stored solution the plate describes.
+
+**A minus sign means "planes, not poles".** The session entered `-1`, and the
+log confirms it drew the faults as great circles:
+
+```
+-> POLES TO FAULTS          5.planes  1 drawn, with   5. lineations !
+-> tensor axis INVD [type 31] plotted !
+```
+
+Those two lines are the whole plate: `-1` and `31`, then `0` to finish. The
+run wrote `PLOT2` rather than `PLOT1`, the same increment-if-it-exists rule
+TENSOR uses for INFO1 and MOHR1.
+
 # VISION: the screen display (2026-07-29)
 
 The same machine has a program named VISION that draws the plot on screen,

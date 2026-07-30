@@ -227,6 +227,45 @@ numerically here because the appendix is unreadable in the available scan. And
 ψ must be scanned over the whole circle: restricting it to [0, π/3] gives Φ = 0
 and the wrong axes, because the minimum often sits near ψ = 336-353°.
 
+### When PSIDIR relabels the axes
+
+INVDIR's own axes come from an unnormalised tensor, so its σ₁/σ₂/σ₃ labelling
+is not automatically right. PSIDIR's job is to check that and fix it if
+needed — but it does not always change anything, and knowing which case you
+are in matters for reading the final answer.
+
+On the frozen INVDIR axes, the normalised tensor's three eigenvalues are
+cos ψ, cos(ψ+120°), cos(ψ+240°), for whatever ψ the PSIDIR scan settles on.
+Those three values come out **in descending order — matching INVDIR's own
+σ₁ > σ₂ > σ₃ slots — only while ψ sits in the last 60° of the turn, 300° to
+360°.** Every other 60° sector belongs to one of the other five orderings.
+
+- **ψ lands in [300°, 360°) → `AXES OK !`.** INVDIR's own σ₁/σ₂/σ₃ labels
+  stand. Φ still moves to PSIDIR's value (that always happens), but the axes
+  it describes are the ones INVDIR already reported — so in this case "the
+  solution" reads the same whether you call it INVDIR's or PSIDIR's.
+- **ψ lands anywhere else → `PERMUTATION`.** σ₁/σ₂/σ₃ get reassigned to
+  different frozen directions than INVDIR's own labels. INVDIR's printed Φ and
+  the final PSIDIR Φ then describe genuinely different axis assignments, not
+  a small correction to the same one — this is the case where you must read
+  off PSIDIR's numbers, not INVDIR's. pyTECTOR flags it wherever it happens:
+  the back-tilt window's summary prints `PSIDIR ...: sigma1/2/3 are NOT
+  INVDIR's labels`, and the underlying flag is
+  `permutation=True, psidir_flag='PERMUTATION'` (see
+  `pytector.invdir.axis_order`).
+
+Verified against the archive: on the 56 runs pyTECTOR reproduces to within 3°
+on σ₁, this 300–360° rule predicts the recorded flag 56 times out of 56 (the
+six misses are all runs whose INVDIR solution itself is not reproduced, so
+they test the reproduction, not the rule).
+
+Angelier's own account (Appendix IV) is that this repairs "artificial
+σ₁/σ₃ permutations" the unnormalised INVDIR pass produces "on poorly varied
+data" — sites where the fault population does not constrain the stress
+tensor tightly enough for the unnormalised form to land the axes in the right
+slots by itself. A permutation is therefore not a sign of a bad answer; it is
+PSIDIR doing the job Angelier built it for.
+
 ### Reproducing a specific historical run
 
 λ is re-derived from scratch by default. Where the pass-1 surface is nearly flat
@@ -835,6 +874,38 @@ CS - 122 - 87W - 124
 不必抄附錄那些多項式（可讀的掃描檔裡附錄看不清楚，這裡用數值重生）。
 另外 ψ 一定要掃整圈：限制在 [0, π/3] 會得到 Φ = 0 的錯誤答案，
 最小值常常落在 ψ ≈ 336-353°。
+
+### PSIDIR 什麼時候會把軸重新貼標籤
+
+INVDIR 自己的軸來自沒正規化的張量，所以它給 σ₁/σ₂/σ₃ 貼的標籤不保證一開始就對。
+PSIDIR 的工作就是檢查、需要時修正——但不是每次都會真的改動什麼，
+而分清楚是哪一種情況，才知道最後該讀哪組數字。
+
+在凍結的 INVDIR 軸上，正規化張量的三個特徵值是 cos ψ、cos(ψ+120°)、cos(ψ+240°)，
+ψ 取 PSIDIR 掃描收斂到的那個值。**這三個值只有在 ψ 落在整圈的最後 60°
+（300° 到 360°）時，才會依大小排序——也就是跟 INVDIR 原本擺的
+σ₁ > σ₂ > σ₃ 順序吻合。** 其餘每個 60° 區間都對應到另外五種排列之一。
+
+- **ψ 落在 [300°, 360°) → `AXES OK !`**。INVDIR 自己的 σ₁/σ₂/σ₃ 標籤不變；
+  Φ 一定會換成 PSIDIR 算出的值（這一步永遠會做），但這個 Φ 屬於的軸，
+  還是 INVDIR 原本報的那組——這種情況下不管你叫它 INVDIR 的解還是 PSIDIR
+  的解，讀出來的都是同一組數字。
+- **ψ 落在其他地方 → `PERMUTATION`**。σ₁/σ₂/σ₃ 被重新分配到跟 INVDIR
+  標籤不同的凍結方向上，這時候 INVDIR 印出來的 Φ 跟最終 PSIDIR 的 Φ
+  描述的是真的不一樣的軸指定，不只是同一組軸上的小修正——這才是必須改讀
+  PSIDIR 數字、不能再用 INVDIR 數字的情況。pyTECTOR 只要遇到就會標出來：
+  back-tilt 視窗的摘要會印 `PSIDIR ...: sigma1/2/3 are NOT INVDIR's
+  labels`，底層旗標是 `permutation=True`、`psidir_flag='PERMUTATION'`
+  （見 `pytector.invdir.axis_order`）。
+
+拿 archive 驗證過：pyTECTOR 重現到 σ₁ 誤差 3° 以內的 56 個 run 裡，
+這條「300–360°」規則 56 次全部猜對記錄下來的旗標（另外 6 個沒猜中的，
+本來就是連 INVDIR 解都沒重現對的 run，所以那 6 個是在測重現度，不是在測這條規則）。
+
+Angelier 自己的說法（Appendix IV）是這一步用來修「資料方位變化太少」時，
+沒正規化的 INVDIR 那段會產生的「人為 σ₁/σ₃ 對調」——也就是斷層資料本身
+對應力張量的約束不夠緊，沒正規化形式自己沒辦法把軸擺對位置的那些站。
+所以出現 PERMUTATION 不代表解算錯了，那正是 PSIDIR 被造出來要做的事。
 
 **S4MIN**（`pytector.modern`，代碼 `S4MN`）＝同一個 S₄ 的精確最小值。
 用特徵分解參數化，所以 λ 天生固定在 √3/2，不需要迭代；搜尋是全域的。

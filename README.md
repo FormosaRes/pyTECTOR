@@ -2,21 +2,15 @@
 
 ![pyTECTOR](docs/img/banner.png)
 
-**Angelier 古應力反演的 Python 重建版 — TENSOR 5.45 (jan91)**
+**Angelier 古應力反演的 Python 重建版，對應 TENSOR 5.45 (jan91)**
 
-照論文重寫，不反譯 exe · 原程式 90 個 run 重現 85 個 · 回轉與 tilt test · 逐筆影響力診斷 · INFO1／MOHR1／HPGL 原格式輸出
+照論文重寫，不反譯執行檔；原程式 90 個 run 重現 85 個；回轉與 tilt test；逐筆影響力診斷；INFO1／MOHR1／HPGL 原格式輸出
 
 [![TENSOR](https://img.shields.io/badge/TENSOR%205.45-reconstructed-1f6feb)](docs/mesure_oracle.md)
-[![Angelier](https://img.shields.io/badge/Angelier%201990-direct%20inversion-1f6feb)](https://doi.org/10.1111/j.1365-246X.1990.tb01777.x)
 [![version](https://img.shields.io/badge/version-0.3.0-brightgreen)](pyproject.toml)
-
 [![python](https://img.shields.io/badge/python-3.x-555)](#quick-start)
-[![PyQt5](https://img.shields.io/badge/GUI-PyQt5-8250df)](pyTECTOR.py)
+[![tests](https://img.shields.io/badge/tests-11%20suites%20passing-2ea44f)](tests/)
 [![archive](https://img.shields.io/badge/archive-85%2F90%20runs%20reproduced-2ea44f)](tests/test_replication.py)
-[![tests](https://img.shields.io/badge/tests-11%20suites-2ea44f)](tests/)
-
-[![fixture](https://img.shields.io/badge/fixture-public%2C%20no%20field%20data-8250df)](tests/fixtures/L12-2/)
-[![output](https://img.shields.io/badge/INFO1%20%2F%20MOHR1%20%2F%20HPGL-byte--identical-2ea44f)](pytector/report.py)
 
 [使用手冊 中文](docs/manual.zh.md) · [English manual](docs/manual.en.md) · [原程式對話全文](docs/mesure_oracle.md) · [English below](#english)
 
@@ -26,19 +20,19 @@
 
 > A Python reconstruction of Jacques Angelier's **TENSOR** palaeostress
 > inversion program, written from the published method rather than by
-> disassembling the original 16-bit DOS binary — and checked against
+> disassembling the original 16-bit DOS binary, and checked against
 > ninety-two runs the original itself produced.
 
-Angelier 的直接反演法從一組斷層面與擦痕線理，解出最能解釋它們的簡化應力張量：
-三個主應力方向與形狀比 Φ。`Tensor.exe` 從 1991 年做這件事到現在，而大量已發表的
-古應力工作建立在它之上。
+Angelier 的直接反演法從一組斷層面與擦痕線理，解出最能解釋它們的簡化應力張量，
+也就是三個主應力方向與形狀比 Φ。`Tensor.exe` 自 1991 年起執行這項計算，
+大量已發表的古應力研究皆建立在其結果之上。
 
-pyTECTOR 做同樣的算術、讀寫同樣的檔案、畫同樣的圖，並補上原程式沒有的東西：
-**回轉（back-tilt）**、**tilt test**、以及**把同一個準則真正最小化**的第二種跑法，
-讓你看得到原方法停在哪裡。
+pyTECTOR 執行相同的運算、讀寫相同的檔案、繪製相同的圖，並補上原程式沒有的部分：
+**回轉（back-tilt）**、**tilt test**，以及**把同一個準則真正最小化**的第二種跑法，
+用來分辨一個答案有多少來自方法本身、多少來自資料。
 
-名稱取自 **TECTOR** — Angelier 自己給這套程式的構造方位資料庫命的名，
-印在它寫出的每一個 INFO1 上。
+名稱取自 **TECTOR**，即 Angelier 為這套程式的構造方位資料庫所取的名稱，
+印在它產生的每一份 INFO1 上。
 
 ---
 
@@ -50,33 +44,37 @@ pyTECTOR 做同樣的算術、讀寫同樣的檔案、畫同樣的圖，並補�
 
 <div align="center"><img src="docs/img/mohr.png" width="420" alt="Mohr diagram"></div>
 
-> 圖全部由 repo 內的**公開 fixture** `tests/fixtures/L12-2/` 產生 —— 那是一個合成站，
-> 不是野外資料，所以任何人 clone 下來都跑得出同一張圖。
+> 以上圖片皆由 repo 內的公開 fixture `tests/fixtures/L12-2/` 產生，
+> 那是一個合成站點，不是野外資料，任何人 clone 這個 repo 都能重製出同一張圖。
 
 ---
 
 ## ✨ 核心特色
 
-- 🎯 **照論文重寫，不反譯** — 原檔是 16-bit MZ、5252 個 relocation、無符號表、
-  疑似 overlay ＋軟體浮點模擬。演算法本身在 Angelier (1984, 1990) 寫得很完整，
-  走論文比走二進位快一個量級。
-- ✅ **對原程式逐位驗證** — archive 的 92 個 run 當回歸測試集。前向量（SIGMN／TAU／
-  TAUST／RUP／ANG）逐筆吻合到檔案精度；帶各站自己記錄的 pass 數與 LAMBDA 重跑，
-  **85/90 站三軸差 <3°**。
-- 🔀 **INVDIR ／ S4MIN 兩種跑法並列** — `INVDIR` 是 Angelier 原方法、原程式跑法；
-  `S4MIN` 是同一準則的精確最小值。**兩者都不是真應力**：υ 準則本身有偏差，
-  餵零雜訊的完美 Bott 資料仍差真張量約 4°。並列是為了看見差在哪，不是為了選一個。
-- 🌀 **回轉與 tilt test** — 原程式沒有的功能。角度用拉桿試，σ₁σ₂σ₃ 即時重算；
-  空心圈是實測軸帶過去的位置、星是重新反演的答案，兩者的差距對 INVDIR 而言是
-  **方法的性質不是地質**（14 組 archive 配對實測中位 σ₁ 10.4°）。
-- 🔬 **逐筆影響力診斷** — 「擬合差」和「決定答案」是兩件事。leave-one-out 逐筆重跑，
-  外加**剔除後殘差** ANG\*／RUP\*：用不含該筆的解去量它，不被它自己的拉力粉飾。
-- 📋 **排除要揭露不要隱藏** — 產生「全部資料」與「剔除後」兩個答案並列的區塊，
-  連同軸移動了幾度，寫進匯出的 INFO1。
-- 📄 **原格式輸出** — INFO1／MOHR1 與原檔逐位元組相同（測試逐欄比對）；
-  HPGL 是重播畫圖程式本身，不是第二份實作。
-- 💾 **Session 存檔** — 記錄、參考面、設定、回轉、已算好的解存成一個 JSON。
-  只存張量，其餘載入時重算 —— 存檔裡的 Φ 不可能與存檔裡的張量矛盾。
+- **照論文重寫，不反譯執行檔。** 原始執行檔是 16-bit MZ 格式，含 5252 個
+  relocation、無符號表，疑似含 overlay 與軟體浮點模擬。演算法本身在
+  Angelier (1984, 1990) 中已完整發表，依論文重建比逆向二進位快上一個量級。
+- **對原程式逐位驗證。** 以 archive 中 92 個 run 作為回歸測試集：前向量
+  （SIGMN／TAU／TAUST／RUP／ANG）逐筆吻合至檔案精度；以各站記錄的 pass 數與
+  LAMBDA 重跑後，**85/90 站三軸角度差小於 3°**。
+- **INVDIR／S4MIN 兩種跑法並列。** `INVDIR` 是 Angelier 原方法、原程式的跑法；
+  `S4MIN` 是同一準則的精確最小值。兩者皆非「真應力」：υ 準則本身有系統性偏差，
+  即使餵入零雜訊的理想合成資料，仍與真實張量相差約 4°。兩種跑法並列，
+  是為了呈現差異所在，而非在其中擇一。
+- **回轉與 tilt test，原程式沒有的功能。** 角度以拉桿試誤調整，σ₁σ₂σ₃ 即時重算；
+  空心圈標示實測軸經同一旋轉後的位置，星形是重新反演的答案。對 INVDIR 而言，
+  兩者的差距反映的是方法本身的性質，而非地質意義（14 組 archive 配對，
+  實測中位數 σ₁ 差 10.4°）。
+- **逐筆影響力診斷。** 「擬合誤差大」與「決定了答案」是兩件不同的事。程式對每筆
+  資料做 leave-one-out 重新反演，並提供**剔除後殘差** ANG\*／RUP\*：
+  以不含該筆資料的解去衡量它，不受該筆資料自身拉力的影響。
+- **排除資訊完整揭露。** 產生「全部資料」與「剔除後」兩個答案並列的區塊，
+  連同軸移動的角度，一併寫入匯出的 INFO1。
+- **原格式輸出。** INFO1／MOHR1 與原始檔案逐位元組相同（測試逐欄位比對）；
+  HPGL 匯出是重播原本的繪圖程式本身，而非另一套獨立實作。
+- **Session 存檔。** 記錄、參考面、設定、回轉、已計算的解存成單一 JSON 檔；
+  只保存張量本身，其餘數值於載入時重新計算，因此存檔中的 Φ 不可能與存檔中的
+  張量互相矛盾。
 
 ---
 
@@ -90,19 +88,19 @@ them: the three principal stress directions and the shape ratio Φ. His program
 `Tensor.exe` did this from 1991 onwards and a great deal of published
 palaeostress work rests on it.
 
-pyTECTOR does the same arithmetic, reads and writes the same files, draws the
+pyTECTOR performs the same arithmetic, reads and writes the same files, draws the
 same diagrams, and adds the parts the original never had: back-tilting, a tilt
-test, and a second run that minimises the same criterion properly so you can see
-how much of an answer is the method rather than the data.
+test, and a second run that minimises the same criterion properly, so that how
+much of an answer comes from the method rather than the data can be assessed.
 
 ## Why not decompile
 
 `Tensor.exe` is a 208 KB 16-bit MS-DOS binary with 5252 relocations, no symbol
 table, probably Turbo Pascal, with overlays and most likely software floating
 point. It will not run on 64-bit Windows, which dropped NTVDM. Decompiling it is
-a dead end for the usual reasons: compilation threw away the names, the types
-and the structure, and 16-bit segmented addressing makes pointers impossible to
-resolve statically.
+not a viable route, for the usual reasons: compilation discarded the names, the
+types and the structure, and 16-bit segmented addressing makes pointers
+impossible to resolve statically.
 
 The algorithm, on the other hand, is fully published:
 
@@ -220,51 +218,52 @@ out smaller than √3/2. The pipeline is:
    re-minimise over ψ across a **full turn**. This fixes Φ and repairs the
    artificial σ₁/σ₃ permutations the unnormalised pass can produce.
 
-Two things to know if you reimplement this. υ² is *quadratic* in (α, β, γ) at
-fixed ψ, so the inner minimisation is an exact 3×3 linear solve; Angelier's
-Appendix I and II do that expansion by hand and the polynomials are regenerated
-numerically here because the appendix is unreadable in the available scan. And
-ψ must be scanned over the whole circle: restricting it to [0, π/3] gives Φ = 0
-and the wrong axes, because the minimum often sits near ψ = 336-353°.
+Two points are relevant to any reimplementation. υ² is *quadratic* in (α, β, γ)
+at fixed ψ, so the inner minimisation is an exact 3×3 linear solve; Angelier's
+Appendix I and II perform that expansion by hand, and the polynomials are
+regenerated numerically here because the appendix is illegible in the available
+scan. Second, ψ must be scanned over the whole circle: restricting it to
+[0, π/3] yields Φ = 0 and the wrong axes, because the minimum often sits near
+ψ = 336-353°.
 
 ### When PSIDIR relabels the axes
 
 INVDIR's own axes come from an unnormalised tensor, so its σ₁/σ₂/σ₃ labelling
-is not automatically right. PSIDIR's job is to check that and fix it if
-needed — but it does not always change anything, and knowing which case you
-are in matters for reading the final answer.
+is not automatically right. PSIDIR's job is to check that and correct it where
+necessary, but it does not always change anything, and which case a given run
+falls into determines which set of numbers should be read as the answer.
 
 On the frozen INVDIR axes, the normalised tensor's three eigenvalues are
 cos ψ, cos(ψ+120°), cos(ψ+240°), for whatever ψ the PSIDIR scan settles on.
-Those three values come out **in descending order — matching INVDIR's own
-σ₁ > σ₂ > σ₃ slots — only while ψ sits in the last 60° of the turn, 300° to
+Those three values come out **in descending order, matching INVDIR's own
+σ₁ > σ₂ > σ₃ slots, only while ψ sits in the last 60° of the turn, 300° to
 360°.** Every other 60° sector belongs to one of the other five orderings.
 
 - **ψ lands in [300°, 360°) → `AXES OK !`.** INVDIR's own σ₁/σ₂/σ₃ labels
-  stand. Φ still moves to PSIDIR's value (that always happens), but the axes
-  it describes are the ones INVDIR already reported — so in this case "the
-  solution" reads the same whether you call it INVDIR's or PSIDIR's.
-- **ψ lands anywhere else → `PERMUTATION`.** σ₁/σ₂/σ₃ get reassigned to
+  stand. Φ still moves to PSIDIR's value, as it always does, but the axes it
+  describes are those INVDIR already reported, so the solution reads the same
+  whether it is attributed to INVDIR or to PSIDIR.
+- **ψ lands anywhere else → `PERMUTATION`.** σ₁/σ₂/σ₃ are reassigned to
   different frozen directions than INVDIR's own labels. INVDIR's printed Φ and
-  the final PSIDIR Φ then describe genuinely different axis assignments, not
-  a small correction to the same one — this is the case where you must read
-  off PSIDIR's numbers, not INVDIR's. pyTECTOR flags it wherever it happens:
-  the back-tilt window's summary prints `PSIDIR ...: sigma1/2/3 are NOT
-  INVDIR's labels`, and the underlying flag is
+  the final PSIDIR Φ then describe genuinely different axis assignments rather
+  than a small correction to the same one, and this is the case in which
+  PSIDIR's numbers, not INVDIR's, must be read as the result. pyTECTOR flags
+  it wherever it occurs: the back-tilt window's summary prints
+  `PSIDIR ...: sigma1/2/3 are NOT INVDIR's labels`, and the underlying flag is
   `permutation=True, psidir_flag='PERMUTATION'` (see
   `pytector.invdir.axis_order`).
 
 Verified against the archive: on the 56 runs pyTECTOR reproduces to within 3°
-on σ₁, this 300–360° rule predicts the recorded flag 56 times out of 56 (the
-six misses are all runs whose INVDIR solution itself is not reproduced, so
-they test the reproduction, not the rule).
+on σ₁, this 300-360° rule predicts the recorded flag 56 times out of 56. The
+six remaining runs are all cases whose INVDIR solution is not itself
+reproduced, so they test the reproduction rather than the rule.
 
 Angelier's own account (Appendix IV) is that this repairs "artificial
 σ₁/σ₃ permutations" the unnormalised INVDIR pass produces "on poorly varied
-data" — sites where the fault population does not constrain the stress
-tensor tightly enough for the unnormalised form to land the axes in the right
-slots by itself. A permutation is therefore not a sign of a bad answer; it is
-PSIDIR doing the job Angelier built it for.
+data", that is, sites where the fault population does not constrain the stress
+tensor tightly enough for the unnormalised form to place the axes in the
+correct slots unaided. A permutation is therefore not an indication of a poor
+solution; it is PSIDIR performing the function Angelier designed it for.
 
 ### Reproducing a specific historical run
 
@@ -467,8 +466,8 @@ surface, and the angle, stay with the user.
 
 The measured axes put through the same rotation are drawn on the restored
 diagram as **open rings**, with a dashed arc to the star. A back-tilted diagram
-on its own does not show you the tilting; the axes are simply somewhere else and
-nothing on the page says where they came from.
+on its own does not convey the tilting itself: the axes are simply in a
+different position, and nothing on the page indicates where they came from.
 
 Ring and star need not coincide, and whether they do depends on the method.
 
@@ -580,10 +579,10 @@ Two deliberate departures:
 - `RMU` can differ by tens of per cent when the normal stress is near zero,
   because it is a ratio. Every other column agrees within 1.
 
-Two layout details worth recording, both easy to get wrong:
+Two layout details are worth recording, both easily implemented incorrectly:
 
 - the two flag fields are two characters wide and **right** aligned, so `!!`
-  butts against the number while a single `!` gets a space in front.
+  abuts the number while a single `!` is preceded by a space.
 - the columns headed `<75` and `<45` are the same statistic taken over the
   subset that passes the threshold, not a repeat of the previous column. On
   0406-7 the mean ANG is 21 over all 29 faults but 15 over the 28 below 45, the
@@ -603,32 +602,36 @@ input and output in the same file:
 | `[7:10]` | **rake (pitch)**, from the strike end at (dip azimuth − 90) |
 | `[47:61]` | echo of what was typed; the last field may be a rake (`62N`) or a trend (`124`) |
 
-Two traps, both fallen into during development:
+Two pitfalls, both encountered during development:
 
 - **The movement direction is rake + 180.** Using the stored value directly
   swaps σ₁ and σ₃.
 - On a site where every plane dips 85-89°, `sin(plunge) = sin(rake)·sin(dip)`
-  makes rake and plunge agree within a degree, so `[7:10]` looks like a plunge.
-  It is not. Site 0406-7, dips 42-89°, settles it.
+  makes rake and plunge agree to within a degree, so `[7:10]` appears to be a
+  plunge. It is not. Site 0406-7, with dips of 42-89°, resolves the ambiguity.
 
 The `03` result line is also fixed width, trend 5 characters and plunge 4,
-packed with no separators. Splitting it on whitespace or with a number regex
-gives garbage.
+packed with no separators. Splitting it on whitespace or with a numeric regex
+produces invalid values.
 
 ## Verification
 
-Seven test files, all passing. They read the original archive when it is
+Eleven test files, all passing. They read the original archive when it is
 available and skip rather than fail when it is not.
 
 | test | what it pins |
 |---|---|
 | `test_replication.py` | the whole pipeline against the original program's own output |
+| `test_fixture.py` | the whole pipeline against the public fixture, no archive needed |
 | `test_report.py` | INFO1 and MOHR1 layout and values |
 | `test_entry.py` | typed records against the stored ones, 35 records |
 | `test_rotate.py` | the back-tilt convention, against seven archive pairs |
 | `test_backtilt.py` | S4MIN is equivariant, INVDIR is not |
+| `test_diagnose.py` | the leave-one-out influence diagnostics |
+| `test_session.py` | a session round-trips without changing any answer |
 | `test_ui_contract.py` | everything the GUI reaches for exists; the HPGL export |
 | `test_gui_logic.py` | the non-Qt half of the interface |
+| `test_import.py` | the package imports cleanly |
 
 Site 0406-7, 29 faults with dips from 42 to 89°, is the site that pins the
 algorithm down:
@@ -777,27 +780,29 @@ until one is added.
 ## 這是什麼
 
 Angelier 的直接反演法從一組實測斷層面與擦痕線理，解出最能解釋它們的簡化應力張量，
-也就是三個主應力方向與形狀比 Φ。他的程式 `Tensor.exe` 從 1991 年起就在做這件事，
-大量已發表的古應力工作建立在它上面。
+也就是三個主應力方向與形狀比 Φ。他的程式 `Tensor.exe` 自 1991 年起執行這項計算，
+大量已發表的古應力研究建立在其結果之上。
 
-pyTECTOR 做同一套運算、讀寫同一批檔案、畫同一種圖，
-再補上原程式沒有的部分：回轉（back-tilting）、傾轉檢驗，
-以及第二種把同一個準則真正最小化的跑法，讓你看得出一個答案有多少是方法造成的、多少是資料造成的。
+pyTECTOR 執行同一套運算、讀寫同一批檔案、繪製同一種圖，
+並補上原程式沒有的部分：回轉（back-tilting）、傾轉檢驗，
+以及第二種將同一準則真正最小化的跑法，用以分辨一個答案有多少來自方法、多少來自資料。
 
 ## 為什麼不反譯
 
-`Tensor.exe` 是 208 KB 的 16 位元 MS-DOS 執行檔，5252 個重定位項、沒有符號表、
-疑似 Turbo Pascal、有 overlay、浮點很可能走軟體模擬。
-64 位元 Windows 移除了 NTVDM，所以它跑不動。
-反譯是死路，理由很平常：編譯把名字、型別、結構都刪了，16 位元分段定址讓指標無法靜態解析。
+`Tensor.exe` 是 208 KB 的 16 位元 MS-DOS 執行檔，含 5252 個重定位項、無符號表、
+疑似以 Turbo Pascal 編譯、含 overlay，浮點運算很可能採軟體模擬。
+64 位元 Windows 已移除 NTVDM，因此它無法執行。
+反譯不可行的理由相當常見：編譯過程已移除名稱、型別與結構，
+而 16 位元分段定址使指標無法靜態解析。
 
-但演算法本身在論文裡寫得很完整（見上方英文段的三篇）。
-所以力氣花在讀論文，以及**量原程式自己吐出來的檔案**，補上論文沒寫的部分。
+演算法本身在論文中已完整發表（見上方英文段落所列三篇）。
+因此本專案的工作集中於研讀論文，以及**量測原程式自身產生的輸出檔案**，
+以補足論文未載明的部分。
 
 ## 為什麼叫 pyTECTOR
 
-Angelier 的論文從頭到尾沒有給程式取名，只叫它「the new direct inversion
-method」。名字是程式自己報的，印在它寫出的每一個 INFO1 上：
+Angelier 的論文全篇未為程式命名，只稱之為「the new direct inversion
+method」。名稱出自程式自身，印在它產生的每一份 INFO1 上：
 
 ```
 Progr. TENSOR, 1975-1991,  version 5.45, jan91
@@ -806,19 +811,19 @@ Copyright 1987,1988,1989,1990,1991 J. Angelier
 *** DATA BASE FOR TECTONIC ORIENTATIONS "TECTOR" ***
 ```
 
-照理最直接的致敬是 TENSOR，但這個名字被佔了兩次：古應力圈今天講「the TENSOR
-program」指的是 Delvaux 的 TENSOR／Win-Tensor（Delvaux & Sperner 2003），
-跟 Angelier 無關；而 PyPI 上的 `pytensor` 是 PyMC 團隊活躍維護的張量庫，
-import 名稱會跟真實環境打架。橫幅上的另一個名字 **TECTOR** 也是 Angelier
-自己的、而且沒有人用。所以叫 pyTECTOR。
+最直接的致敬名稱應為 TENSOR，但該名稱已有兩處衝突：在古應力領域中，
+「the TENSOR program」現指 Delvaux 的 TENSOR／Win-Tensor（Delvaux & Sperner 2003），
+與 Angelier 無關；而 PyPI 上的 `pytensor` 是 PyMC 團隊持續維護的張量運算庫，
+import 名稱會與實際安裝環境衝突。橫幅上的另一個名稱 **TECTOR** 同樣出自 Angelier，
+且目前無其他專案使用，故定名為 pyTECTOR。
 
-## 怎麼跑
+## 安裝與執行
 
-Windows 一鍵安裝：下載整個 repo，雙擊 **`install.bat`**。
-它會自己找 Python（優先 Anaconda）、裝好 numpy／scipy／matplotlib／PyQt5、
-在桌面放一個 pyTECTOR 捷徑。或者用
+Windows 一鍵安裝：下載整個 repo 後雙擊 **`install.bat`**。
+該腳本會自動尋找 Python（優先使用 Anaconda）、安裝 numpy／scipy／matplotlib／PyQt5，
+並在桌面建立 pyTECTOR 捷徑。亦可使用
 `pip install .`（或 `pip install git+https://github.com/FormosaRes/pyTECTOR`），
-會多一個 `pytector` 指令。
+安裝後會提供 `pytector` 指令。
 
 ```
 pyTECTOR.bat                           桌面介面
@@ -826,9 +831,9 @@ python demo_report.py [站檔]           反演一個舊站，印出 INFO1 + MOH
 python run_batch.py [根目錄] [out.csv] 對整棵資料夾跑兩種方法
 ```
 
-逐一功能的完整操作說明在 **[docs/manual.zh.md](docs/manual.zh.md)**。
+逐項功能的完整操作說明見 **[docs/manual.zh.md](docs/manual.zh.md)**。
 
-輸入是四欄，打完就看到它落在投影網上：
+輸入分為四個欄位，輸入後即顯示於投影網上：
 
 ```
 CS - 122 - 87W - 124
@@ -839,137 +844,144 @@ CS - 122 - 87W - 124
 +------------------- 信心度 C/P/S ＋ 運動方式 I/N/S/D
 ```
 
-或直接開舊 run：指向那個**沒有副檔名、檔名等於站名**的資料檔（例如 `L12`），
-斷層資料、INFO1 全部一起載進來。
+亦可直接開啟舊有的 run：指向那個**沒有副檔名、檔名等於站名**的資料檔（例如 `L12`），
+斷層資料與 INFO1 會一併載入。
 
 ## 準則
 
 - σ = **T**·n（式 3）；τ = σ − (n·σ)n（式 4-5）
 - **υ² = λ² + |τ|² − 2λ(s·σ)**（式 A1），最小化 **S₄ = Συ²**（式 13）
 - RUP = 100·|υ|/(√3/2)，範圍 0-200 %；ANG = s 與 τ 的夾角，0-180°
-- 張量正規化是**特徵值平方和 = 3/2**（式 A16），**不是**固定 σ₁ − σ₃。
-  兩者只在 Φ = 0.5 相同，而準則不是尺度不變的，所以這個差別會改變答案。
+- 張量正規化採**特徵值平方和 = 3/2**（式 A16），**並非**固定 σ₁ − σ₃。
+  兩種定義僅在 Φ = 0.5 時相同，而此準則不具尺度不變性，故此差異會改變結果。
 
-**這個準則本身有偏差，不是誰的程式有 bug。**
-υ 同時要求「預測剪應力方向對上實測滑動」與「剪應力大小接近 λ」，
-所以餵零雜訊的完美 Bott 合成資料，它仍然差真張量約 4°，會系統性偏向讓斷層承受高剪應力的方位。
-純角度準則 F2 在同一批資料上是 0.00°。
-這就是 TectonicsFP 這類軟體跟 Angelier 算不一樣的根本原因。
+**此準則本身帶有系統性偏差，並非任何程式的錯誤。**
+υ 同時要求「預測剪應力方向與實測滑動一致」與「剪應力大小接近 λ」，
+因此即使餵入零雜訊的理想 Bott 合成資料，結果仍與真實張量相差約 4°，
+並系統性地偏向使斷層承受高剪應力的方位。
+純角度準則 F2 在同一批資料上的誤差為 0.00°。
+這即是 TectonicsFP 等軟體與 Angelier 計算結果不一致的根本原因。
 
 ## 兩種跑法：INVDIR 與 S4MIN
 
-用「它是什麼」命名，不用會暗示優劣的字母。因為上面那個理由，**兩者都不是「真應力」**。
+兩者以其實質內容命名，避免使用暗示優劣的代號。基於上述理由，**兩者皆非「真應力」**。
 
-**INVDIR**（`pytector.invdir`，代碼 `INVD`）＝ Angelier 原方法、原程式的跑法。
-用他自己的 (α, β, γ, ψ) 參數化（式 14 / A2）。這個張量**沒有正規化**，
-最大剪應力會隨著解移動，這才是 λ 必須逐趟迭代的原因，
-也是 INFO1 印出來的 `LAMBDA` 小於 √3/2 的原因。流程兩段：
+**INVDIR**（`pytector.invdir`，代碼 `INVD`）為 Angelier 原方法、原程式的跑法，
+採用他自己的 (α, β, γ, ψ) 參數化（式 14 / A2）。此張量**未經正規化**，
+其最大剪應力隨解的移動而改變，這正是 λ 必須逐趟迭代的原因，
+也是 INFO1 所印出的 `LAMBDA` 小於 √3/2 的原因。流程分兩段：
 
-1. **INVDIR 第 k 趟**：在當前 λ 下最小化 S₄，然後把 λ 換成該解的 taumax。
-   INFO1 印的 `(NO k)` **是迭代趟數**，不是「兩個解取哪一個」。
-2. **PSIDIR**：軸凍結在 INVDIR 的結果，改用正規化的 A16 形式、λ = √3/2，
-   對 ψ **整圈**重新最小化。這一步定下 Φ，並修掉前一段可能產生的 σ₁/σ₃ 人為對調。
+1. **INVDIR 第 k 趟**：在當前 λ 下最小化 S₄，隨後將 λ 更新為該解的 taumax。
+   INFO1 印出的 `(NO k)` **為迭代趟數**，而非「在兩個解之間擇一」。
+2. **PSIDIR**：將軸凍結於 INVDIR 的結果，改用正規化的 A16 形式、λ = √3/2，
+   對 ψ **整圈**重新最小化。此步驟決定 Φ，並修正前一階段可能產生的
+   σ₁/σ₃ 人為對調。
 
-兩個實作要點。固定 ψ 時 υ² 對 (α, β, γ) 是二次式，內層就是精確的 3×3 線性解，
-不必抄附錄那些多項式（可讀的掃描檔裡附錄看不清楚，這裡用數值重生）。
-另外 ψ 一定要掃整圈：限制在 [0, π/3] 會得到 Φ = 0 的錯誤答案，
-最小值常常落在 ψ ≈ 336-353°。
+兩項實作要點：固定 ψ 時 υ² 對 (α, β, γ) 為二次式，內層即精確的 3×3 線性求解，
+無須轉抄附錄中的多項式（現有掃描檔的附錄辨識度不足，此處改以數值方式重新生成）。
+另外 ψ 必須掃描整圈：若限制於 [0, π/3] 會得到 Φ = 0 的錯誤結果，
+因為最小值常落在 ψ ≈ 336-353°。
 
 ### PSIDIR 什麼時候會把軸重新貼標籤
 
-INVDIR 自己的軸來自沒正規化的張量，所以它給 σ₁/σ₂/σ₃ 貼的標籤不保證一開始就對。
-PSIDIR 的工作就是檢查、需要時修正——但不是每次都會真的改動什麼，
-而分清楚是哪一種情況，才知道最後該讀哪組數字。
+INVDIR 的軸來自未正規化的張量，因此它為 σ₁/σ₂/σ₃ 指派的標籤不保證正確。
+PSIDIR 的職責就是檢查並在必要時修正；但它並非每次都會實際改動任何東西，
+而一個 run 屬於哪一種情況，決定了最終應該把哪一組數字當成答案。
 
-在凍結的 INVDIR 軸上，正規化張量的三個特徵值是 cos ψ、cos(ψ+120°)、cos(ψ+240°)，
-ψ 取 PSIDIR 掃描收斂到的那個值。**這三個值只有在 ψ 落在整圈的最後 60°
-（300° 到 360°）時，才會依大小排序——也就是跟 INVDIR 原本擺的
-σ₁ > σ₂ > σ₃ 順序吻合。** 其餘每個 60° 區間都對應到另外五種排列之一。
+在凍結的 INVDIR 軸上，正規化張量的三個特徵值為 cos ψ、cos(ψ+120°)、cos(ψ+240°)，
+其中 ψ 取 PSIDIR 掃描收斂到的值。**這三個值只有在 ψ 落在整圈的最後 60°
+（300° 到 360°）時才依大小排序，也就是與 INVDIR 原本設定的
+σ₁ > σ₂ > σ₃ 順序一致。** 其餘每個 60° 區間各對應另外五種排列之一。
 
-- **ψ 落在 [300°, 360°) → `AXES OK !`**。INVDIR 自己的 σ₁/σ₂/σ₃ 標籤不變；
-  Φ 一定會換成 PSIDIR 算出的值（這一步永遠會做），但這個 Φ 屬於的軸，
-  還是 INVDIR 原本報的那組——這種情況下不管你叫它 INVDIR 的解還是 PSIDIR
-  的解，讀出來的都是同一組數字。
-- **ψ 落在其他地方 → `PERMUTATION`**。σ₁/σ₂/σ₃ 被重新分配到跟 INVDIR
-  標籤不同的凍結方向上，這時候 INVDIR 印出來的 Φ 跟最終 PSIDIR 的 Φ
-  描述的是真的不一樣的軸指定，不只是同一組軸上的小修正——這才是必須改讀
-  PSIDIR 數字、不能再用 INVDIR 數字的情況。pyTECTOR 只要遇到就會標出來：
-  back-tilt 視窗的摘要會印 `PSIDIR ...: sigma1/2/3 are NOT INVDIR's
-  labels`，底層旗標是 `permutation=True`、`psidir_flag='PERMUTATION'`
+- **ψ 落在 [300°, 360°) → `AXES OK !`**。INVDIR 的 σ₁/σ₂/σ₃ 標籤維持不變。
+  Φ 一律會換成 PSIDIR 計算的值，但該 Φ 所屬的軸仍是 INVDIR 原本報告的那一組，
+  因此無論將此解歸給 INVDIR 或 PSIDIR，讀出來的都是同一組數字。
+- **ψ 落在其他區間 → `PERMUTATION`**。σ₁/σ₂/σ₃ 被重新指派到與 INVDIR 標籤
+  不同的凍結方向上。此時 INVDIR 印出的 Φ 與最終 PSIDIR 的 Φ 描述的是不同的
+  軸指派，而非同一組軸上的細微修正；這正是必須改讀 PSIDIR 數值、
+  不可再引用 INVDIR 數值的情況。pyTECTOR 遇到時一律標示：back-tilt 視窗的
+  摘要會印出 `PSIDIR ...: sigma1/2/3 are NOT INVDIR's labels`，
+  底層旗標為 `permutation=True`、`psidir_flag='PERMUTATION'`
   （見 `pytector.invdir.axis_order`）。
 
-拿 archive 驗證過：pyTECTOR 重現到 σ₁ 誤差 3° 以內的 56 個 run 裡，
-這條「300–360°」規則 56 次全部猜對記錄下來的旗標（另外 6 個沒猜中的，
-本來就是連 INVDIR 解都沒重現對的 run，所以那 6 個是在測重現度，不是在測這條規則）。
+以 archive 驗證：在 pyTECTOR 重現至 σ₁ 誤差 3° 以內的 56 個 run 中，
+上述「300-360°」規則 56 次全部正確預測了檔案記錄的旗標。
+其餘 6 個未命中的 run，本身連 INVDIR 解都未能重現，
+因此那 6 筆檢驗的是重現程度，而非這條規則。
 
-Angelier 自己的說法（Appendix IV）是這一步用來修「資料方位變化太少」時，
-沒正規化的 INVDIR 那段會產生的「人為 σ₁/σ₃ 對調」——也就是斷層資料本身
-對應力張量的約束不夠緊，沒正規化形式自己沒辦法把軸擺對位置的那些站。
-所以出現 PERMUTATION 不代表解算錯了，那正是 PSIDIR 被造出來要做的事。
+Angelier 本人的說明（Appendix IV）指出，這一步用於修正「資料方位變化不足」時，
+未正規化的 INVDIR 階段會產生的「人為 σ₁/σ₃ 對調」，也就是斷層資料本身
+對應力張量的約束不足、未正規化形式無法自行將軸置於正確位置的那些站點。
+因此出現 PERMUTATION 並不代表解有問題，而正是 PSIDIR 被設計出來要處理的情形。
 
-**S4MIN**（`pytector.modern`，代碼 `S4MN`）＝同一個 S₄ 的精確最小值。
-用特徵分解參數化，所以 λ 天生固定在 √3/2，不需要迭代；搜尋是全域的。
-它在**全部 92 個 archive 站**都得到更低的 S₄，無一例外
-（L12 0.2360 對 0.3018；0406-7 7.3201 對 7.6198）。
-也就是說，原程式並沒有走到它自己準則的最小值，因為 λ 停在未收斂處。
+**S4MIN**（`pytector.modern`，代碼 `S4MN`）為同一個 S₄ 的精確最小值。
+其採特徵分解參數化，故 λ 依定義恆為 √3/2，無須迭代，且搜尋為全域搜尋。
+它在**全部 92 個 archive 站**均取得更低的 S₄，無一例外
+（L12 為 0.2360 對 0.3018；0406-7 為 7.3201 對 7.6198）。
+換言之，原程式並未達到其自身準則的最小值，因為 λ 停在未收斂之處。
 
-### λ 是什麼：Angelier 自己的說法
+### λ 的定義：Angelier 的原始說明
 
-以下都不是逆向工程猜的，是他 1990 年論文 Section 4 與 Appendix IV 白紙黑字寫的。
+以下內容並非逆向推測，而是他 1990 年論文 Section 4 與 Appendix IV 明確載明的。
 
-λ 是**這個張量能產生的最大剪應力**。準則同時要求預測剪應力方向對上實測滑動、
-大小又要大到足以克服摩擦，λ 就是它瞄準的那個大小。
+λ 為**該張量所能產生的最大剪應力**。準則同時要求預測剪應力方向與實測滑動一致，
+且其大小足以克服摩擦，λ 即為其目標值。
 
-正規化的 A16 張量的最大剪應力是常數；式 (14) 的張量不是。原因他講得很白：
-對角線帶著 ψ、非對角線不帶，所以**轉動應力軸會改變應力大小**。
-他的總結是「軸的旋轉與應力大小在解析上不獨立」（1990, Section 4），
-並說如果不是這樣，λ 就只是個常數、根本不需要調整。
+正規化的 A16 張量最大剪應力為常數，式 (14) 的張量則不然。原因他闡述得相當清楚：
+對角線項帶有 ψ、非對角線項則無，因此**轉動應力軸會改變應力大小**。
+他的結論是「軸的旋轉與應力大小在解析上不獨立」（1990, Section 4），
+並指出若非如此，λ 便僅是一個常數，完全無須調整。
 
-他的補救就是那個迭代：跑個幾趟，每趟把 λ 換成前一趟解的最大剪應力。`(NO k)` 數的就是這個。
+他的處理方式即為該迭代：執行數趟，每趟將 λ 更新為前一趟解的最大剪應力。
+`(NO k)` 計數的正是此項。
 
-**Angelier 也明講 A16 那個形式比較好**：那樣 λ 的調整整個不需要、λ 恆等於 √3/2；
-他沒用是因為那個式子他解析解不出來，同時註明「沒有理由認為不可能」（Appendix IV）。
-PSIDIR 這最後一步，就是把 A16 形式在收尾用一次，他自己說是「為了安全加上的」，
-用來修未正規化形式在資料方位變化太少時會產生的 σ₁/σ₃ 人為對調。
+**Angelier 亦明確指出 A16 形式更為理想**：採用該形式時 λ 的調整完全不必要、
+λ 恆等於 √3/2；他未採用的原因是無法對該式求出解析解，同時註明
+「沒有理由認為不可能」（Appendix IV）。
+PSIDIR 這最後一步即是在收尾階段套用一次 A16 形式，他自述為「為求穩妥而增設」，
+用以修正未正規化形式在資料方位變化不足時所產生的 σ₁/σ₃ 人為對調。
 
-所以 **S4MIN 不是把 Angelier 的方法「現代化」，而是他描述過、想要但當年做不出來的那個形式**，
-只是改用數值方法走到。兩種跑法的差距是 1990 年那個限制的代價，不是地質上的分歧。
+因此 **S4MIN 並非將 Angelier 的方法「現代化」，而正是他描述過、
+意圖採用但當年無法實現的那個形式**，只是改以數值方法達成。
+兩種跑法的差距源自 1990 年的解析限制，而非地質判斷上的分歧。
 
-### λ 迭代不會收斂，而「提早停」正是重點
+### λ 迭代不會收斂，提早停止即為其設計要點
 
-Angelier 只說「幾趟連續的決定」，沒說幾趟，也沒宣稱收斂。拿 archive 驗證：
-**92 站裡有 72 站會發散。** 0406-7 就是其中之一：放它一直跑，
-λ 從 0.866 → 1.009 → 1.115 → … 到第 200 趟變成 1.1 × 10⁹，
-S₄ 從高於最小值 4 % 惡化到 78 %。L12 則會收斂，停在 λ = 2.2404、高於最小值 1.5 %。
+Angelier 僅提及「數趟連續的決定」，未指明趟數，亦未主張收斂。以 archive 驗證：
+**92 站中有 72 站會發散。** 0406-7 即為其中之一：若持續執行，
+λ 由 0.866 → 1.009 → 1.115 → … 至第 200 趟達 1.1 × 10⁹，
+S₄ 則由高於最小值 4 % 惡化至 78 %。L12 則會收斂，停在 λ = 2.2404、高於最小值 1.5 %。
 
-機制是正回饋：λ 變大就是要求更大的剪應力，
-求解器照辦的方式是把沒正規化的張量撐大，撐大的張量最大剪應力又更大，變成下一輪的 λ。
+其機制為正回饋：λ 增大即要求更大的剪應力，
+求解器的因應方式是撐大未正規化的張量，而撐大後的張量最大剪應力又更大，
+成為下一輪的 λ。
 
-所以**使用者自選趟數**而不是「迭代到收斂」，不是偷懶；在多數站上那是唯一讓答案不爆掉的做法。
-archive 印證：62 站 NO 1、25 站 NO 2、五站 3 到 5。
+因此採**使用者自選趟數**而非「迭代至收斂」並非簡化處理；
+在多數站點上，這是唯一能使結果保持有限的做法。
+archive 的紀錄亦印證此點：62 站用 NO 1、25 站用 NO 2、五站用 3 至 5。
 
-### 從 INFO1 直接讀收斂程度
+### 從 INFO1 判讀收斂程度
 
-INFO1 印三個數字，很容易讀錯一個：
+INFO1 印出三個數字，容易誤讀其中之一：
 
 ```
-SOLUTION INVDIR (NO 1)  LAMBDA= 0.68     <- INVDIR 實際用的 λ
+SOLUTION INVDIR (NO 1)  LAMBDA= 0.68     <- INVDIR 實際採用的 λ
 SOLUTION PSIDIR         AXES OK !
-LAMBDA= 0.87            TAUMAX= 0.80     <- PSIDIR：λ 天生就是 √3/2，
-                                            所以每一個檔案都印 0.87
+LAMBDA= 0.87            TAUMAX= 0.80     <- PSIDIR：λ 依定義即為 √3/2，
+                                            故所有檔案皆印出 0.87
 ```
 
-`TAUMAX` 也不是 √3/2。特徵值為 cos(ψ + k·2π/3) 的正規化張量，最大剪應力是
+`TAUMAX` 亦非 √3/2。對特徵值為 cos(ψ + k·2π/3) 的正規化張量，其最大剪應力為
 
 ```
 taumax = 3 / (4·√(Φ² − Φ + 1))
 ```
 
-從 Φ = 0 或 1 時的 0.75 到 Φ = 0.5 時的 0.866。87 個 archive run 對到 0.005 以內，
-這也順便驗證了整個理解沒有錯。
+其值自 Φ = 0 或 1 時的 0.75 至 Φ = 0.5 時的 0.866。此式與 87 個 archive run
+吻合至 0.005 以內，同時也驗證了整體理解無誤。
 
-**第一個數字爬到跟第三個數字一樣，才是收斂。** 88 個有這兩個數字的 run，
-中位差距 0.160，沒有任何一個在 0.02 以內：
+**唯有第一個數字上升至與第三個數字相等，才代表收斂。** 在具備這兩個數字的
+88 個 run 中，差距中位數為 0.160，且無任何一筆落在 0.02 以內：
 
 | TAUMAX − LAMBDA | 站數 |
 |---|---|
@@ -978,11 +990,12 @@ taumax = 3 / (4·√(Φ² − Φ + 1))
 | 0.05 到 0.15 | 31 |
 | 超過 0.15 | 53 |
 
-這不是在批評當年的跑法：迭代在多數站上會發散，停在 NO 1、NO 2 是對的。
-它的意思是**記錄下來的 λ 是一個停止點、不是一個解**，
-而 **archive LAMBDA** 這個功能存在的目的就是重現那個停止點。
+此處並非批評當年的執行方式：迭代在多數站點上會發散，停在 NO 1 或 NO 2 是正確的判斷。
+其意義在於**記錄下來的 λ 是一個停止點，而非一個解**，
+而 **archive LAMBDA** 這項功能存在的目的即為重現該停止點。
 
-這也表示 INVDIR 與 S4MIN 的差距**不是一個固定數字**，它取決於站別與當年用的趟數：
+由此可知 INVDIR 與 S4MIN 的差距**並非一個固定數字**，
+而取決於站點以及當年所採用的趟數：
 
 | | n ≥ 7（55 站） | n ≥ 15（10 站） |
 |---|---|---|
@@ -990,140 +1003,150 @@ taumax = 3 / (4·√(Φ² − Φ + 1))
 | \|ΔΦ\| | 中位 0.074 | 中位 0.065 |
 | S₄ 高於最小值 | 中位 27 % | 中位 6 % |
 
-0406-7 的 4 % 是偏好的那一端。
-⚠️ 注意 S₄ 的百分比在 n 小的時候是**壞指標**：張量有四個未知數，
-所以只有四五筆資料時全域最小值會趨近於零，任何跟它相比的比值都會爆掉。
-該讀的是軸與軸之間的夾角。
+0406-7 的 4 % 屬於表現較佳的一端。
+須注意 S₄ 的百分比在 n 較小時是**不可靠的指標**：張量有四個未知數，
+因此僅有四至五筆資料時全域最小值會趨近於零，任何與之相比的比值都會失去意義。
+應據以判讀的是軸與軸之間的夾角。
 
-**兩者差多少**：只看資料真正約束住的那根軸（Φ<0.5 看 σ₁、Φ>0.5 看 σ₃），
-在 n ≥ 7 的 55 站，中位 8.8°、p90 16.7°、最大 28.4°。
-n ≥ 15 時收斂到中位 4.8°、最大 12.5°，所以分歧主要是**樣本數問題**，不是方法錯。
-對照組：INVD 自身在無雜訊合成資料上的偏差約 4°，Angelier 引的野外擦痕觀測誤差 ±5-15°。
-兩種跑法的差距落在這個雜訊底線之內。
+**兩者的實際差距**：僅檢視資料真正約束住的那根軸（Φ < 0.5 看 σ₁、Φ > 0.5 看 σ₃），
+在 n ≥ 7 的 55 站中，中位數 8.8°、p90 為 16.7°、最大 28.4°。
+n ≥ 15 時收斂至中位數 4.8°、最大 12.5°，可見此分歧主要為**樣本數效應**，
+而非方法本身的缺陷。
+對照基準：INVD 自身在無雜訊合成資料上的偏差約 4°，
+而 Angelier 引用的野外擦痕觀測誤差為 ±5-15°。
+兩種跑法的差距落在此雜訊水準之內。
 
-**實務建議**：以 **INVDIR 為主**，維持與既有 run、與 TENSOR 系文獻的一致性；
-**S4MIN 當穩健性檢驗**併陳。
+**實務建議**：以 **INVDIR 為主**，以維持與既有 run 及 TENSOR 系文獻的一致性；
+並以 **S4MIN 作為穩健性檢驗**併陳。
 
 ## 回轉（back-tilting）
 
-回轉有自己的視窗，從工具列開。主視窗只呈現實測資料，不做旋轉，
-所以那裡的投影網永遠不需要一行標題來說明它現在是什麼方位。
+回轉功能有獨立的視窗，由工具列開啟。主視窗僅呈現實測資料、不做任何旋轉，
+因此該處的投影網無須額外標註目前所處的方位。
 
-回轉視窗把資料轉過去、對前後兩個狀態各跑一次反演，左右並列：
-左邊 as measured、右邊 back-tilted，下面是兩者的數字。設定旋轉有三種方式：
+回轉視窗會將資料轉至指定方位，並對前後兩個狀態各執行一次反演，左右並列呈現：
+左側為 as measured、右側為 back-tilted，下方列出兩者的數值。設定旋轉的方式有三種：
 
 | 方式 | 輸入 | 作用 |
 |---|---|---|
-| 參考面 | 走向 / 傾角，或用它的 pole 給 trend / plunge | 把該面轉回水平的那個旋轉 |
-| 旋轉軸 | trend / plunge / 角度 | 直接套用，右手定則 |
-| 部分回轉 | 0 到 125 % | 上面任一種的任意比例 |
+| 參考面 | 走向 / 傾角，或以其 pole 給定 trend / plunge | 將該面轉回水平所需的旋轉 |
+| 旋轉軸 | trend / plunge / 角度 | 直接套用，依右手定則 |
+| 部分回轉 | 0 到 125 % | 上述任一方式的任意比例 |
 
-斷層面法向與滑動向量都會一起轉，所以 rake 與運動感都跟著走。
-慣例不是猜的，是對 archive 驗過的：把原站與它的回轉版之間的旋轉解出來（對法向做 Kabsch），
-七組全部重現到 2° 以內。
+斷層面法向與滑動向量會一併旋轉，因此 rake 與運動感亦隨之改變。
+此慣例並非推測，而是對 archive 驗證過的：解出原站與其回轉版之間的旋轉
+（對法向施以 Kabsch 演算法），七組全部重現至 2° 以內。
 
-參考面畫成虛線大圓加它的 pole，並且跟著資料一起轉，
-所以回轉對不對看得出來：虛線圓會壓平到基準圓上，pole 會走到圓心。
+參考面以虛線大圓及其 pole 繪出，並隨資料一同旋轉，
+因此回轉是否正確可直接目視判斷：虛線圓會壓平至基準圓上，pole 則移至圓心。
 
-**角度不是算出來的。** 它沒有解析解，是試出來看結果，
-這也是為什麼 archive 的資料夾名稱就是當年試過的值，`(backtilted 020 -20)`。
-程式只是讓「試」變快，並把當前套用的旋轉標清楚。選哪個面、轉幾度，仍然是使用者的判斷。
+**旋轉角度並非計算而得。** 該角度無解析解，須以試誤方式檢視結果，
+這也是 archive 資料夾名稱直接記錄當年試用值的原因，例如 `(backtilted 020 -20)`。
+本程式的作用僅在於加速試誤過程，並明確標示當前套用的旋轉；
+參考面的選擇與旋轉角度的判斷仍由使用者決定。
 
-### 軸被轉去哪
+### 軸的位移
 
-把實測的軸用同一個旋轉轉過去，畫在回轉後的圖上，是**空心圈**，並用虛線弧連到星形。
-理由很簡單：單看一張回轉後的圖，你看不到「傾轉」這件事，
-軸只是換了個位置，紙上沒有任何東西告訴你它原本在哪。
+將實測的軸經同一旋轉轉換後，繪於回轉後的圖上，以**空心圈**表示，並以虛線弧連接至星形。
+理由在於：單獨檢視一張回轉後的圖，無法看出「傾轉」本身，
+軸僅是位於不同位置，圖面上並無任何資訊指出其原始方位。
 
-⚠️ **圈和星不一定重合，而且會不會重合跟方法有關。**
+**空心圈與星形不必然重合，且是否重合取決於所用方法。**
 
-- **S4MIN 精確等變**。S₄ 是旋轉不變的，所以它的最小值跟著資料轉。
-  推論：回轉**不可能**改變 S4MIN 的 Φ 與 S₄，傾轉檢驗的全部內容就是「軸最後落在哪」。
-- **INVDIR 不等變**。式 (14) 把張量的**對角線**釘在**地理座標**的
-  cos ψ、cos(ψ+2π/3)、cos(ψ+4π/3)。資料一轉，那個四參數族就變成另一個族，
-  對回轉後的資料重算，搜的是別的地方。
+- **S4MIN 為精確等變。** S₄ 具旋轉不變性，因此其最小值隨資料一同旋轉。
+  由此可推論：回轉**不可能**改變 S4MIN 的 Φ 與 S₄，
+  傾轉檢驗的全部內容即在於「軸最終落於何處」。
+- **INVDIR 非等變。** 式 (14) 將張量的**對角線**固定於**地理座標**下的
+  cos ψ、cos(ψ+2π/3)、cos(ψ+4π/3)。資料一經旋轉，該四參數族即成為另一個族，
+  對回轉後的資料重新計算，所搜尋的是不同的解空間。
 
-**這是 Angelier 方法本身的性質，不是這個重建版的 bug。**
-用原程式自己跑的十四組 archive 回轉配對驗證（Kabsch 擬合 <2° 確認同一批資料）：
-把母站的軸轉過去 vs 檔案裡回轉後那次的結果，
-中位差 σ₁ **10.4°**、σ₂ **24.3°**、σ₃ **23.6°**，最大到 88.7°。
-最大的幾筆多半落在 Φ 接近 0 或 1、兩根軸近簡併的站，但不是全部：
+**此為 Angelier 方法本身的性質，而非本重建版的缺陷。**
+以原程式自身執行的十四組 archive 回轉配對驗證（經 Kabsch 擬合 < 2° 確認為同一批資料）：
+將母站的軸經旋轉轉換後，與檔案中回轉版的計算結果相比，
+中位差為 σ₁ **10.4°**、σ₂ **24.3°**、σ₃ **23.6°**，最大達 88.7°。
+差距最大的數筆多落在 Φ 接近 0 或 1、兩根軸近乎簡併的站點，但並非全部如此：
 0214-5（13 筆、Φ 0.46 → 0.72）σ₁ 仍差 19.8°、σ₃ 差 22.8°。
 
-**這對論文的意思**：只用 INVDIR 的話，「回轉前後軸變了」有一部分是在讀參數化、不是讀地質，
-所以「回轉後 σ₁₂₃ 回到水平／垂直」本身不能當證據。
-乾淨的判準要看 S4MIN（它的軸可以證明只是純旋轉），INVDIR 留作與舊 run 的連續性對照。
-視窗會把兩者並列並印出差距。測試鎖在 `tests/test_backtilt.py`。
+**對研究撰寫的意義**：若僅採用 INVDIR，「回轉前後軸發生變化」有一部分反映的是
+參數化的性質而非地質意義，因此「回轉後 σ₁₂₃ 回到水平／垂直」本身不足以作為證據。
+較嚴謹的判準應採 S4MIN（其軸可證明僅為純旋轉），INVDIR 則保留作為與舊有 run
+的連續性對照。視窗會同時列出兩者及其差距。相關測試見 `tests/test_backtilt.py`。
 
-### 「轉回水平」不會自動就是對的
+### 「轉回水平」並非必然正確
 
-那個做法預設斷層早於傾轉。如果斷層是**在傾轉過程中**形成的，
-只有一部分傾轉發生在它們之後，把全部轉回去就是過度回轉，
-會得到一個從來不存在的應力張量。
+該做法預設斷層形成早於傾轉。若斷層是**在傾轉過程中**形成的，
+則僅有部分傾轉發生於其後，將全部傾轉轉回即構成過度回轉，
+會得到一個從未存在過的應力張量。
 
-**Tilt test** 把旋轉從 0 掃到 125 %，每一步都反演，同時畫兩個診斷量：
+**Tilt test** 將旋轉自 0 掃描至 125 %，每一步皆執行反演，並繪出兩項診斷量：
 
 | 診斷量 | 說明 |
 |---|---|
-| 平均 ANG、RUP、S₄ | 單一張量解釋資料的好壞。最佳值落在 100 % 附近，表示斷層早於傾轉 |
-| Andersonian 失配 | 90° 減去最陡那根軸的傾沒，所以 0 就是一垂直兩水平。同時判斷體制：σ₁ 垂直為正斷、σ₂ 為平移、σ₃ 為逆衝 |
+| 平均 ANG、RUP、S₄ | 單一張量解釋資料的程度。最佳值落在 100 % 附近，表示斷層形成早於傾轉 |
+| Andersonian 失配 | 90° 減去最陡那根軸的傾沒，故 0 代表一軸垂直、兩軸水平。同時判定應力體制：σ₁ 垂直為正斷、σ₂ 為平移、σ₃ 為逆衝 |
 
-最佳解落在遠低於完全回轉的地方，就是同傾轉斷層的樣子，程式會直接講。
-兩個判準若差超過旋轉量的 20 %，也會講，因為那個分歧要先解釋清楚，兩個才都能信。
-兩者都不是證明，是診斷。
+最佳解落在遠低於完全回轉之處，即為同傾轉斷層的特徵，程式會明確標示。
+若兩項判準的差異超過旋轉量的 20 %，程式亦會提示，
+因為該分歧須先釐清，兩項判準才具參考價值。兩者皆非證明，而是診斷指標。
 
-實例：0404-4C-2 對一個假造的參考面，兩個判準都隨回轉**變差**，
-最佳落在 10 %，Andersonian 失配從 40.8° 升到 49.2°。
-把那個面轉回水平，會安靜地得到一個比原始資料還差的答案。
+實例：0404-4C-2 對一個虛構的參考面，兩項判準均隨回轉而**變差**，
+最佳值落在 10 %，Andersonian 失配自 40.8° 升至 49.2°。
+將該面轉回水平，會在無警示的情況下得到比原始資料更差的結果。
 
-## 畫圖：HPGL 才是畫風的標準答案
+## 繪圖：HPGL 為畫風的判準依據
 
-每個 run 資料夾裡都有一個 `HPGL`，是純文字的繪圖機向量指令。
-它不是「對程式畫了什麼的描述」，它**就是**程式逐筆畫出來的那張圖。
-所以這裡的畫風是量它量出來的，不是看論文插圖猜的。
+每個 run 資料夾內都有一個 `HPGL` 檔，內容為純文字的繪圖機向量指令。
+它並非對程式繪圖行為的描述，而**即是**程式逐筆繪出的那張圖。
+因此本專案的畫風係經量測該檔案而得，並非依論文插圖推測。
 
-- **投影是等面積 Schmidt**。這是測出來的，不是假設的：
-  大圓在等角投影下是正圓弧，在等面積下不是。
-  實測圓弧擬合殘差 0.0044 / 0.0062 / 0.0010，等面積的預測是 0.0040 / 0.0055 / 0.0007，等角應該是 0。
-- **星形**：σ₁ 五角、σ₂ 四角（斜置）、σ₃ 三角。大小不是固定的：
-  `size = 0.1004 + 0.0928·(0.5 − Φ)·λᵢ`（21 張圖 63 顆星擬合，rms 0.00063）。
-  Φ = 0.5 時三顆等大，所以大小順序在 Φ = 0.5 兩側會翻轉。
-- **擦痕符號是剪切對偶，不是單支箭頭**：實心圓點加兩支平行軸線，各自側偏 0.024，
-  所以圖上呈 Z 字形。頭部隨信心度：S 完全無頭、P 每端一條單邊倒鉤、C 每端一個兩段式細長頭。
-  倒鉤與側偏在哪一側是 `sign(滑動 · 走向)`，89 筆全中；用運動字母判只有 83 筆對。
-- **粗箭頭**在圓外，沿 σ₁ 向內、σ₃ 向外，傾沒超過 45° 的那一對就不畫。
-- ⚠️ **外框不是對稱於投影網中心**。93 個 archive HPGL 完全一致：
-  x −1.2527 到 1.2547、y **−1.3047 到 1.4585**（單位＝基準圓半徑），標註全是固定欄左對齊。
-  這裡先前假設對稱，底邊低了 0.15。
+- **投影法為等面積 Schmidt 投影。** 此結論係經量測而得，非出於假設：
+  大圓在等角投影下為正圓弧，在等面積投影下則非。
+  實測圓弧擬合殘差為 0.0044 / 0.0062 / 0.0010，等面積投影的預測值為
+  0.0040 / 0.0055 / 0.0007，若為等角投影則應為 0。
+- **星形符號**：σ₁ 為五角、σ₂ 為四角（斜置）、σ₃ 為三角。其大小非固定值：
+  `size = 0.1004 + 0.0928·(0.5 − Φ)·λᵢ`（以 21 張圖、63 顆星擬合，rms 0.00063）。
+  Φ = 0.5 時三者等大，故大小順序在 Φ = 0.5 兩側會反轉。
+- **擦痕符號為剪切對偶，非單一箭頭**：實心圓點搭配兩支平行軸線，各側偏 0.024，
+  故圖面上呈 Z 字形。頭部形式依信心度而定：S 無頭、P 每端一條單邊倒鉤、
+  C 每端一個兩段式細長頭。倒鉤與側偏所在側由 `sign(滑動 · 走向)` 決定，
+  89 筆全數符合；若依運動字母判定則僅 83 筆正確。
+- **粗箭頭**位於圓外，沿 σ₁ 向內、沿 σ₃ 向外；傾沒超過 45° 的該對不予繪出。
+- **外框並非對稱於投影網中心。** 93 個 archive HPGL 檔完全一致：
+  x 自 −1.2527 至 1.2547、y 自 **−1.3047 至 1.4585**（單位為基準圓半徑），
+  標註皆為固定欄左對齊。本專案先前曾假設對稱，導致底邊偏低 0.15。
 
-**HPGL 匯出**的做法是讓 `pytector.penrec` 假扮成 matplotlib Axes，
-重播 `plot.plot_site` 本身，所以檔案裡有的東西跟圖上完全一樣，沒有第二份實作可以漂移。
-輸出落在 archive 自己的框上（400-5420 × 396-5928 繪圖機單位），由 `tests/test_ui_contract.py` 把關。
+**HPGL 匯出**的實作方式是令 `pytector.penrec` 代替 matplotlib Axes，
+重播 `plot.plot_site` 本身，因此檔案內容與圖面完全一致，
+不存在第二套實作可能產生偏移。輸出對齊 archive 自身的框架
+（400-5420 × 396-5928 繪圖機單位），由 `tests/test_ui_contract.py` 驗證。
 
 ## 舊檔讀寫
 
-舊 run 直接讀回來；反演之後，pyTECTOR 會用原格式寫回 `INFO1` 與 `MOHR1`，並顯示在介面上。
+舊有的 run 可直接讀入；反演完成後，pyTECTOR 會以原格式寫出 `INFO1` 與 `MOHR1`，
+並顯示於介面上。
 
-`tests/test_report.py` 用記錄的解重新產生兩個檔，跟原檔對拆：
-**版面**（比對每個數字的欄位跨距）與**數值**分開檢查。
-目前狀態：兩站都是 0 版面差異、0 數值差異。
+`tests/test_report.py` 以記錄的解重新產生這兩個檔案，並與原始檔案比對，
+分別檢查**版面**（比對每個數字的欄位跨距）與**數值**。
+目前狀態：兩站皆為 0 項版面差異、0 項數值差異。
 
 刻意保留的兩處差異：
 
-- 橫幅寫 pyTECTOR，不冒充 TENSOR 5.45。機器要讀的部分（定寬表格、`03` 結果行）維持原樣，
-  所以檔案仍然可以用 `pytector.tensorfile` 讀回去。
-- `RMU` 在正向應力接近零時可以差幾十 %，因為它是比值。其他每一欄都在 ±1 之內。
+- 檔頭橫幅標示 pyTECTOR，不冒用 TENSOR 5.45 的名義。供程式解析的部分
+  （定寬表格、`03` 結果行）維持原樣，因此檔案仍可由 `pytector.tensorfile` 讀回。
+- `RMU` 在正向應力接近零時可能相差數十個百分點，因其為比值。其餘各欄皆在 ±1 之內。
 
-兩個很容易寫錯的版面細節：
+兩項容易實作錯誤的版面細節：
 
-- 兩個旗標欄寬 2 字元、**右**對齊，所以 `!!` 貼齊數字，單一 `!` 前面要補一個空格。
-- 標題 `<75` 與 `<45` 那兩欄，是**同一個統計量取通過門檻的子集**，不是重複前一欄。
-  0406-7 全部 29 筆的平均 ANG 是 21，低於 45 的 28 筆是 15，差的就是那筆 174° 的離群值。
+- 兩個旗標欄位寬 2 字元且**靠右**對齊，因此 `!!` 會緊貼數字，
+  而單一個 `!` 前方需補一個空格。
+- 標題為 `<75` 與 `<45` 的兩欄，是**同一統計量取通過門檻後的子集**，
+  並非重複前一欄。0406-7 全部 29 筆的平均 ANG 為 21，低於 45 的 28 筆為 15，
+  差異即來自那筆 174° 的離群值。
 
 ## 檔案格式
 
-用資料檔、`MOHR1`、`INFO1`、`Mesure_key.txt` 互相對照解出來，兩站 35 筆驗證過。
-定寬 ASCII，一個 run 一個資料夾，**輸入與輸出在同一個檔**：
+係以資料檔、`MOHR1`、`INFO1`、`Mesure_key.txt` 相互對照解出，並以兩站 35 筆資料驗證。
+格式為定寬 ASCII，每個 run 一個資料夾，**輸入與輸出位於同一檔案**：
 
 | 位置 | 內容 |
 |---|---|
@@ -1131,32 +1154,37 @@ n ≥ 15 時收斂到中位 4.8°、最大 12.5°，所以分歧主要是**樣�
 | `[2:5]` | **真正的傾向**，已經含象限字母的判斷，所以 `SN 174 74E` 是 84 不是 264 |
 | `[5:7]` | 傾角 |
 | `[7:10]` | **rake（pitch）**，從（傾向−90）那一端量起 |
-| `[47:61]` | 當年打進去的原始欄位；最後一欄可能是 rake（`62N`）也可能是 trend（`124`） |
+| `[47:61]` | 當年輸入的原始欄位；最後一欄可能是 rake（`62N`）或 trend（`124`） |
 
-兩個踩過的坑：
+兩處實際遭遇過的陷阱：
 
-- ⚠️ **滑動方向 = rake + 180°**。直接用欄位值會讓 σ₁ 與 σ₃ 對調。
-- ⚠️ 如果一站所有面的傾角都在 85-89°，`sin(plunge) = sin(rake)·sin(dip)` 會讓 rake 與 plunge 差不到 1°，
-  於是 `[7:10]` 看起來像 plunge。它不是。用傾角 42-89° 的 0406-7 才能定案。
+- **滑動方向 = rake + 180°。** 直接採用欄位值會導致 σ₁ 與 σ₃ 對調。
+- 若某站所有面的傾角皆在 85-89° 之間，`sin(plunge) = sin(rake)·sin(dip)`
+  會使 rake 與 plunge 相差不到 1°，導致 `[7:10]` 看似 plunge，實則並非。
+  須以傾角範圍 42-89° 的 0406-7 才能確認。
 
-`03` 結果行同樣是定寬（trend 5 字元、plunge 4 字元），中間沒有分隔符。
-用空白切或用數字正規表示式抓，都會黏成亂碼。
+`03` 結果行同為定寬格式（trend 佔 5 字元、plunge 佔 4 字元），中間無分隔符號。
+以空白切分或以數字正規表示式擷取，皆會得到錯誤結果。
 
 ## 驗證
 
-七個測試檔全過。有 archive 就讀，沒有就 skip，不會 fail。
+十一個測試檔全數通過。有 archive 時即讀取，無 archive 時則 skip，不會 fail。
 
-| 測試 | 鎖住什麼 |
+| 測試 | 驗證範圍 |
 |---|---|
-| `test_replication.py` | 整條流程對上原程式自己的輸出 |
+| `test_replication.py` | 整條流程對照原程式自身的輸出 |
+| `test_fixture.py` | 整條流程對照公開 fixture，無須 archive |
 | `test_report.py` | INFO1 / MOHR1 的版面與數值 |
-| `test_entry.py` | 打字輸入對上檔案裡存的值，35 筆 |
-| `test_rotate.py` | 回轉慣例，對七組 archive 配對 |
+| `test_entry.py` | 打字輸入對照檔案中儲存的值，35 筆 |
+| `test_rotate.py` | 回轉慣例，對照七組 archive 配對 |
 | `test_backtilt.py` | S4MIN 等變、INVDIR 不等變 |
-| `test_ui_contract.py` | 介面用到的東西都存在；HPGL 匯出 |
-| `test_gui_logic.py` | 介面裡不牽涉 Qt 的那一半 |
+| `test_diagnose.py` | leave-one-out 影響力診斷 |
+| `test_session.py` | session 存讀一輪不改變任何結果 |
+| `test_ui_contract.py` | 介面所調用的項目均存在；HPGL 匯出 |
+| `test_gui_logic.py` | 介面中不涉及 Qt 的部分 |
+| `test_import.py` | 套件可正常匯入 |
 
-0406-7（29 筆，傾角 42-89°）是把演算法釘死的那一站：
+0406-7（29 筆，傾角 42-89°）是確立演算法的關鍵站點：
 
 ```
 前向模型 vs MOHR1        max |SIGMN| 0.001  |TAU| 0.001  |TAUST| 0.001
@@ -1167,38 +1195,40 @@ INVDIR 流程              sigma1 0.047 度   sigma2 0.020   sigma3 0.032
                          印出的 LAMBDA 0.682（0.680）
 ```
 
-L12（六個近平行、近垂直的面）是簡併站，重現得比較鬆：軸約 1°、平均 RUP 在 0.6 % 內。
-容差是**逐站設定**來反映這件事，不是全域放寬。
+L12（六個近平行、近垂直的面）為簡併站點，重現程度較為寬鬆：軸約 1°、
+平均 RUP 在 0.6 % 以內。容差係**逐站設定**以反映此差異，而非全域放寬。
 
-⚠️ 測試裡不會建立任何 Qt 物件：從自動化 shell 啟動 QApplication 會彈出平台外掛錯誤框然後退出。
-測試改成驗證介面與函式庫之間的契約。
+測試中不會建立任何 Qt 物件：自動化 shell 啟動 QApplication 會彈出平台外掛
+錯誤對話框並結束程序。測試改以驗證介面與函式庫之間的契約為主。
 
 ## 效能
 
-ψ 掃描原本每趟呼叫純量常式 4000 次，上面再疊 120 步三分搜尋，
-archive LAMBDA 又把整套重跑約九十次。而其實幾乎沒有一步跟 ψ 有關：
-只有對角線帶 ψ，而且是線性的，所以 3×3 normal matrix 是資料集的常數，
-每個 ψ 只剩一次對同一個分解的回代。PSIDIR 與 S4MIN 的起點掃描用特徵座標系同樣化簡。
+ψ 掃描原本每趟呼叫純量常式 4000 次，並疊加 120 步三分搜尋，
+而 archive LAMBDA 又將整套流程重跑約九十次。實際上其中幾乎沒有一步與 ψ 相關：
+僅對角線帶有 ψ，且為線性關係，因此 3×3 normal matrix 為資料集的常數，
+每個 ψ 僅需對同一分解執行一次回代。PSIDIR 與 S4MIN 的起點掃描亦以特徵座標系
+做同樣的化簡。
 
-0406-7（29 筆）實測：
+0406-7（29 筆）實測結果：
 
-| | 之前 | 現在 |
+| | 最佳化前 | 最佳化後 |
 |---|---|---|
 | INVDIR 2 趟 | 0.975 s | 0.004 s |
 | S4MIN 400 起點 | 0.208 s | 0.052 s |
 | archive LAMBDA | 6.775 s | 0.063 s |
 
-與被取代的常式差 1e-13。
+與被取代的常式差異為 1e-13。
 
 ## 參考資料集
 
-測試與推導腳本會讀原程式的真實輸出。那是**未發表的野外資料**，所以路徑不寫死在原始碼裡：
+測試與推導腳本會讀取原程式的實際輸出。該資料屬**未發表的野外資料**，
+因此路徑不寫入原始碼中：
 
 ```
 set PYTECTOR_ARCHIVE=<放 TENSOR run 資料夾的那個目錄>
 ```
 
-沒設就 skip，不會 fail。資料本身不隨這個 repo 發布。
+未設定時測試會 skip，不會 fail。資料本身不隨本 repo 發布。
 
 ## 專案結構
 
@@ -1222,56 +1252,63 @@ pytector/           函式庫
   archive           參考資料集的位置
 pyTECTOR.py         桌面介面
 tests/              對 archive 的回歸測試
-research/           每個常數是怎麼量出來的，該夾有自己的 README
+research/           各項常數的量測過程，該資料夾另有 README
 ```
 
 ## 更新紀錄
 
 **0.3.0**
 
-- 改名 pyTENSOR → **pyTECTOR**，取自 Angelier 自己的資料庫名，
-  避開 Delvaux 的 TENSOR／Win-Tensor 與 PyMC 的 `pytensor`（見「為什麼叫 pyTECTOR」）。
-  環境變數 `PYTENSOR_ARCHIVE` 仍可用，是 `PYTECTOR_ARCHIVE` 的舊拼法
-- 一鍵安裝：`install.bat` 裝好依賴並在桌面放捷徑；`pip install .` 也可以，
-  會多一個 `pytector` 指令
-- 在原機器實跑 MESURE 5.51 與 TENSOR 5.45 當 oracle，兩個 session 都轉錄在
-  docs/mesure_oracle.md
-- **公開的端到端 fixture**：tests/fixtures/L12-2 是原程式對合成站的完整一跑，
-  tests/test_fixture.py 不需要 archive 就能對整條管線驗證，軸準到 0.05°
+- 更名 pyTENSOR → **pyTECTOR**，取自 Angelier 自身的資料庫名稱，
+  以避開 Delvaux 的 TENSOR／Win-Tensor 與 PyMC 的 `pytensor`
+  （見「為什麼叫 pyTECTOR」）。環境變數 `PYTENSOR_ARCHIVE` 仍可使用，
+  為 `PYTECTOR_ARCHIVE` 的舊有拼法
+- 一鍵安裝：`install.bat` 安裝相依套件並建立桌面捷徑；亦可使用 `pip install .`，
+  安裝後提供 `pytector` 指令
+- 於原機器實際執行 MESURE 5.51 與 TENSOR 5.45 作為 oracle，
+  兩個 session 的完整紀錄見 docs/mesure_oracle.md
+- **公開的端到端 fixture**：tests/fixtures/L12-2 為原程式對合成站的完整執行結果，
+  tests/test_fixture.py 無須 archive 即可驗證整條流程，軸精度達 0.05°
 
 **0.2.0**
 
-- 回轉獨立成一個視窗，實測與回轉左右並列，並把實測軸經同一旋轉畫成空心圈
-- 確立並用測試鎖住：INVDIR 不是旋轉等變的、S4MIN 是；用原程式的 14 組 archive 配對驗證
-- HPGL 匯出改成重播真正的畫圖程式，整張圖都會進檔案，不再只有基準圓與斷層面
-- 修正外框（不對稱）與標註錨點，螢幕與所有匯出一起修
-- ψ 掃描全部向量化，INVERT 從幾秒降到毫秒
-- 介面：常駐一行說明現在畫的是什麼、資料改過但還沒重算會顯示過期標記、每個面板有標題、側欄分段加細線
+- 回轉功能獨立為一個視窗，實測與回轉結果左右並列，
+  並將實測軸經同一旋轉後繪為空心圈
+- 確立並以測試固定：INVDIR 非旋轉等變、S4MIN 為等變；
+  以原程式的 14 組 archive 配對驗證
+- HPGL 匯出改為重播實際的繪圖程式，完整圖面均寫入檔案，
+  不再僅含基準圓與斷層面
+- 修正外框（非對稱）與標註錨點，螢幕顯示與所有匯出一併修正
+- ψ 掃描全面向量化，INVERT 由數秒降至毫秒等級
+- 介面調整：常駐一行說明當前繪製內容、資料變更但尚未重算時顯示過期標記、
+  各面板加上標題、側欄分段加入細線
 
 **0.1.0**
 
-- 準則、品質估計量與前向模型，35 筆驗證
+- 準則、品質估計量與前向模型，以 35 筆資料驗證
 - INVDIR ＋ PSIDIR，以及 S4MIN
 - 舊檔讀取、原格式的 INFO1 與 MOHR1 輸出
-- 量自 archive HPGL 的 Angelier 畫風投影網
+- 依 archive HPGL 量測而得的 Angelier 畫風投影網
 - 桌面介面、1991 模式
 
-## 還沒做
+## 尚未實作
 
-- 寫回 TENSOR 格式的資料檔（站頭欄位已經從原程式實跑解出來了，
+- 寫出 TENSOR 格式的資料檔（站頭欄位已由原程式實際執行解出，
   見 [docs/mesure_oracle.md](docs/mesure_oracle.md)）
-- R4DT／R4DS／R2DT／R2DS 這幾個 Angelier 的疊代搜尋法，刻意還沒開始
-  （TENSOR 自己的說明有記載，見 docs/mesure_oracle.md）
+- R4DT／R4DS／R2DT／R2DS 等 Angelier 的疊代搜尋法，刻意尚未著手
+  （TENSOR 自身的說明文件有相關記載，見 docs/mesure_oracle.md）
 - 授權條款
 
 ## 授權與致謝
 
-方法是 Jacques Angelier 的。這是依他發表的論文、加上對他程式輸出檔的量測所做的獨立重寫，
-沒有從原執行檔取用任何程式碼。
+方法為 Jacques Angelier 所提出。本專案係依其發表的論文，
+並輔以對其程式輸出檔案的量測所完成的獨立重寫，
+未自原執行檔取用任何程式碼。
 
-開啟畫面是 Angelier 自己畫的台灣弧陸碰撞塊體圖。
-他把玉里附近的地震震源機制當作「把這個方法用在地震學資料上」的示範例（1994, fig. 4.44）。
-那是已發表的圖，**沒有**放進這個 repo，所以新 clone 下來不會有開啟畫面，
-藏在它後面的彩蛋也開不了。把 `Taiwan Tectonic Map.jpg` 放回專案根目錄兩者就會回來。
+開啟畫面採用 Angelier 繪製的台灣弧陸碰撞塊體圖。
+他以玉里附近的地震震源機制作為「將此方法應用於地震學資料」的示範案例
+（1994, fig. 4.44）。該圖為已發表的圖件，**未**納入本 repo，
+因此新 clone 的版本不會有開啟畫面，其後的彩蛋亦無法開啟。
+將 `Taiwan Tectonic Map.jpg` 置於專案根目錄即可恢復兩者。
 
-維護者：Chi-Hsiu Pang。授權尚未選定，在加入之前請視為保留所有權利。
+維護者：Chi-Hsiu Pang。授權條款尚未選定，在正式加入之前請視為保留所有權利。

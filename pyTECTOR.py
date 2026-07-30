@@ -133,6 +133,21 @@ def rule():
     return f
 
 
+def _looks_like_session(path):
+    """True for a pyTECTOR session under some name other than .tec.
+
+    A cheap sniff, not a parse: session files are JSON and start with
+    '{', which a TENSOR site file -- fixed-width columns, no braces -- never
+    does.
+    """
+    try:
+        with open(path, encoding='utf-8', errors='replace') as fh:
+            head = fh.read(200).lstrip()
+    except OSError:
+        return False
+    return head.startswith('{') and '"program"' in head
+
+
 # ------------------------------------------------------------------ worker --
 class Worker(QtCore.QThread):
     done = QtCore.pyqtSignal(object)
@@ -380,7 +395,6 @@ class Main(QtWidgets.QMainWindow):
         self.results = {}
         self.archive = None
         self.bt_window = None
-        self.backtilt = None      # back-tilted panels, if any are being shown
         self.planes = []
         self._loading = False
         self.site_name = '01'
@@ -966,8 +980,17 @@ class Main(QtWidgets.QMainWindow):
     def open_site(self):
         fn, _ = QtWidgets.QFileDialog.getOpenFileName(
             self, 'Open a TENSOR site file', '', 'All files (*)')
-        if fn:
-            self._load(fn)
+        if not fn:
+            return
+        if fn.lower().endswith(session.EXT):
+            # a pyTECTOR session, not a TENSOR site file. The dialog above
+            # has no extension filter (TENSOR sites are extension-less), so
+            # picking the wrong "Open" button here is an easy mistake, and
+            # the TENSOR reader is lenient about garbled content: it would
+            # silently show an empty site instead of the one that was saved.
+            self._load_session(fn)
+            return
+        self._load(fn)
 
     def scan_folder(self):
         """Find every run under a folder and offer them in a picker, rather
@@ -1011,6 +1034,13 @@ class Main(QtWidgets.QMainWindow):
             site = tensorfile.read_site(path)
         except Exception as exc:
             QtWidgets.QMessageBox.warning(self, 'pyTECTOR', str(exc))
+            return
+        if not site.records and _looks_like_session(path):
+            # the extension-less TENSOR case does not apply here: this is a
+            # pyTECTOR session under some other name, and the site reader
+            # found none of its own fixed-width columns in the JSON and
+            # would otherwise report an empty site with no explanation
+            self._load_session(path)
             return
         self.records = [dict(r) for r in site.records]
         self.site_name = site.name
@@ -1202,30 +1232,20 @@ class Main(QtWidgets.QMainWindow):
             return
 
         panels = max(len(keys) + (1 if want_fit else 0), 1)
-        # A back-tilt, once settled on, belongs BESIDE the measured answer and
-        # never instead of it: the comparison is the whole content of a tilt
-        # test, and the measured stereogram is the thing being tested against.
-        # So it takes a second row and leaves the records and the first row
-        # exactly as they were.
-        bt = getattr(self, 'backtilt', None)
-        if bt and not keys:
-            bt = None
-        rows = 2 if bt else 1
         col = [0]
         title_colour = '#1E1E1C' if plot.PEN == 'k' else plot.PEN
 
-        def cell(title=None, sub=None, row=0):
+        def cell(title=None, sub=None):
             """A panel. On screen it gets a plain title above the frame so
             there is no hunting in the footer for what you are looking at;
             exported figures keep Angelier's layout and omit it."""
             col[0] += 1
-            ax = self.fig.add_subplot(rows, panels, row * panels + col[0])
+            ax = self.fig.add_subplot(1, panels, col[0])
             ax.set_facecolor(plot.PAPER)
             if title and not annotate:
                 ax.set_title(title + ('\n' + sub if sub else ''),
-                             fontsize=11 if rows == 1 else 10,
-                             fontweight='600', color=title_colour,
-                             pad=8 if rows == 1 else 5, linespacing=1.5)
+                             fontsize=11, fontweight='600',
+                             color=title_colour, pad=8, linespacing=1.5)
             return ax
 
         try:
@@ -1258,29 +1278,6 @@ class Main(QtWidgets.QMainWindow):
                                  site_code=self.site_name,
                                  header='fitted shear', declination=decl)
 
-        if bt:
-            rot = bt['rot']
-            rn, rs = rotate.rotate_site(n, s, *rot)
-            bsides = plot.strike_slip_sign_vectors(rn, rs)
-            tag = rotate.describe(*rot)
-            col[0] = 0
-            for k in keys:
-                ax = cell('%s  BACK-TILTED' % NAME[k], tag, row=1)
-                r = bt['results'].get(k)
-                plot.plot_site(ax, rn, rs, r, certainty=conf, sides=bsides,
-                               site_code=self.site_name,
-                               reference=self.reference_now(rot=rot),
-                               declination=decl,
-                               header='%s  back-tilted%s'
-                                      % (NAME[k], ' ' + tag))
-                if annotate and r:
-                    plot.annotate_result(ax, r, n_data=len(self.active))
-            if want_fit and bt['results'].get(keys[0]) is not None:
-                ax = cell('FITTED SHEAR  BACK-TILTED', tag, row=1)
-                plot.plot_fitted(ax, rn, bt['results'][keys[0]]['T'],
-                                 site_code=self.site_name,
-                                 header='fitted shear back-tilted',
-                                 declination=decl)
         if stale:
             # unmistakable, because acting on an out-of-date stereogram is the
             # kind of mistake that survives all the way into a figure
@@ -1380,8 +1377,10 @@ class Main(QtWidgets.QMainWindow):
         fn, _ = QtWidgets.QFileDialog.getOpenFileName(
             self, 'Open session', session.default_dir(),
             'pyTECTOR session (*%s);;All files (*)' % session.EXT)
-        if not fn:
-            return
+        if fn:
+            self._load_session(fn)
+
+    def _load_session(self, fn):
         try:
             head = session.load(fn)                    # records first
             recs = head['records']
@@ -1423,28 +1422,6 @@ class Main(QtWidgets.QMainWindow):
         self.status.showMessage('opened %s   %d faults, %d result%s'
                                 % (fn, len(self.records), len(self.results),
                                    '' if len(self.results) == 1 else 's'))
-
-    def show_backtilted(self, rot, results):
-        """Put the back-tilted stereograms on the main figure, as a second row.
-
-        Nothing is replaced. The records stay as they were measured, the site
-        keeps its name, and the measured stereograms stay on the top row: a
-        tilt test is a comparison, so throwing away the thing being compared
-        against would leave the answer unreadable.
-        """
-        self.backtilt = (dict(rot=tuple(float(x) for x in rot),
-                              results=dict(results)) if rot else None)
-        self._draw()
-        if self.backtilt:
-            self.status.showMessage(
-                'back-tilted %s shown below the measured data; the records '
-                'are unchanged' % rotate.describe(*self.backtilt['rot']))
-
-    def clear_backtilted(self):
-        if getattr(self, 'backtilt', None):
-            self.backtilt = None
-            self._draw()
-            self.status.showMessage('back-tilted panels removed')
 
     def _save_report(self, which):
         r, kw = self._info_kwargs()

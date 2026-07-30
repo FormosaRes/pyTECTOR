@@ -2,6 +2,10 @@
 """Run every TENSOR site in a folder tree through both modes and tabulate the
 difference. The output table is the method-uncertainty estimate.
 
+Also writes an axial rose of the batch's sigma1 and sigma3 trends, which is
+the multi-site question a single stereogram cannot answer: what direction did
+this population of determinations actually act in.
+
     python run_batch.py [root_folder] [out.csv]
 """
 import csv
@@ -11,7 +15,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from pytector import core, invdir, modern, tensorfile
+from pytector import core, invdir, modern, rose, tensorfile
 
 from pytector.archive import ROOT
 
@@ -93,6 +97,60 @@ def main(root, out_csv):
     print('  sigma1 A vs B : median %.1f deg, 90th pct %.1f deg, max %.1f deg'
           % (np.median(d1), np.percentile(d1, 90), d1.max()))
     print('  |dPhi|        : median %.3f, max %.3f' % (np.median(dp), dp.max()))
+
+    _roses(rows, out_csv)
+
+
+def _roses(rows, out_csv):
+    """Axial roses of sigma1 and sigma3 over the whole batch.
+
+    A rose of one site would be three points; it earns its place across many
+    determinations. Which of the two panels is worth reading is not fixed: a
+    population whose sigma1 all plunge steeply has an empty compression rose
+    and a perfectly good extension one, so rose.pick_readable decides and the
+    readable panel is drawn bold.
+    """
+    groups = {
+        'sigma1  compression': [(r['A_s1_trend'], r['A_s1_plunge'])
+                                for r in rows],
+        'sigma3  extension': [(r['A_s3_trend'], r['A_s3_plunge'])
+                              for r in rows],
+    }
+    read = rose.pick_readable(groups)
+    print('\n  rose, INVDIR solutions (axes plunging under %g deg only):'
+          % rose.SHALLOW_LIMIT)
+    for label, axs in groups.items():
+        trends, dropped = rose.shallow_only(axs)
+        st = rose.axial_stats(trends)
+        note = '   <- read this' if label == read else ''
+        if st:
+            print('    %-22s n=%-3d mean %03.0f  R %.2f%s'
+                  % (label, len(trends), st['mean'], st['R'], note))
+        else:
+            print('    %-22s n=%-3d no usable axis, %d too steep%s'
+                  % (label, len(trends), dropped, note))
+
+    try:
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+    except Exception as exc:                        # pragma: no cover
+        print('    (no figure: %s)' % exc)
+        return
+    fig, axes = plt.subplots(1, 2, figsize=(7.0, 3.9),
+                             subplot_kw=dict(projection='polar'))
+    fig.patch.set_facecolor('white')
+    for ax, label in zip(axes, list(groups)):
+        rose.plot_rose(ax, groups[label], title=label,
+                       emphasis=(label == read))
+    fig.suptitle('%d sites' % len(rows), fontsize=11, fontweight='600',
+                 color=rose.INK, y=1.02)
+    fig.subplots_adjust(left=0.07, right=0.95, top=0.70, bottom=0.10,
+                        wspace=0.35)
+    png = os.path.splitext(out_csv)[0] + '_rose.png'
+    fig.savefig(png, dpi=300, facecolor='white', bbox_inches='tight')
+    plt.close(fig)
+    print('    figure: %s' % png)
 
 
 if __name__ == '__main__':

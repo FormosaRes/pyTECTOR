@@ -112,7 +112,15 @@ def collect(root, method='auto'):
             continue
 
         run_id = os.path.relpath(path, root).replace(os.sep, '/')
-        rec = dict(run_id=run_id, folder=folder, site_name=site.name,
+        # The FOLDER is the station, not the file inside it. On a real archive
+        # those disagree on 57 of 92 runs: a file called PANG is the author,
+        # BOUNDARY is a description, LL-11 is a typo for LY-11, and several
+        # files carry the original field number rather than the station name.
+        # Worse, the file name is not unique: LL-3b-1 and LL-3b-2 both hold a
+        # file called LL-3B, so keying on it merges two distinct runs.
+        rec = dict(run_id=run_id, folder=folder,
+                   site=os.path.basename(folder),
+                   file_name=site.name,
                    site_code=getattr(site, 'code', ''), n=len(site),
                    has_hpgl='HPGL' in files,
                    has_mesure_key='Mesure_key.txt' in files,
@@ -204,12 +212,18 @@ def _horizontal(rec):
 
 
 def _key_index(recs):
-    """Look-ups by run id and by site name, so a side file can use either."""
+    """Look-ups by run id, station (folder) and file name.
+
+    The file name is accepted because some older lists use it, but it is
+    ambiguous: two runs can hold files of the same name. A key that resolves
+    to more than one run is applied to all of them and the caller is told, so
+    an ambiguous key can never quietly land on the wrong run.
+    """
     idx = {}
     for r in recs:
-        idx.setdefault(r['run_id'], []).append(r)
-        idx.setdefault(r['site_name'], []).append(r)
-        idx.setdefault(os.path.basename(r['folder']), []).append(r)
+        for key in (r['run_id'], r['site'], r.get('file_name')):
+            if key:
+                idx.setdefault(str(key), []).append(r)
     return idx
 
 
@@ -221,7 +235,7 @@ def _attach(recs, path, columns, label):
     for a single run.
     """
     idx = _key_index(recs)
-    touched, unmatched = set(), []
+    touched, unmatched, ambiguous = set(), [], []
     with io.open(path, encoding='utf-8-sig', newline='') as fh:
         for row in csv.DictReader(fh):
             row = {(k or '').strip().lower(): (v or '').strip()
@@ -233,6 +247,8 @@ def _attach(recs, path, columns, label):
             if not targets:
                 unmatched.append(key)
                 continue
+            if len(targets) > 1:
+                ambiguous.append((key, [t['run_id'] for t in targets]))
             for r in targets:
                 if id(r) in touched:
                     continue
@@ -247,6 +263,10 @@ def _attach(recs, path, columns, label):
         print('  %d key(s) in the file matched no run: %s'
               % (len(unmatched), ', '.join(unmatched[:8])
                  + (' ...' if len(unmatched) > 8 else '')))
+    for key, runs in ambiguous:
+        print('  ambiguous key %r matched %d runs, applied to all: %s'
+              % (key, len(runs), ', '.join(runs)))
+        print('    use the station (folder) name or the run id to be precise')
     return applied, unmatched
 
 
@@ -261,7 +281,8 @@ def attach_coords(recs, path):
 
 
 TABLE_COLS = OrderedDict([
-    ('run_id', 'run'), ('site_name', 'site'), ('stage', 'phase'),
+    ('site', 'station'), ('stage', 'phase'), ('run_id', 'run'),
+    ('file_name', 'file'),
     ('n', 'n'), ('solution_from', 'solution'), ('permutation', 'perm'),
     ('s1_trend', 's1 trend'), ('s1_plunge', 's1 pl'),
     ('s2_trend', 's2 trend'), ('s2_plunge', 's2 pl'),
@@ -302,7 +323,7 @@ def write_table(recs, outdir):
 
 
 FAULT_COLS = OrderedDict([
-    ('run_id', 'run'), ('site_name', 'site'), ('stage', 'phase'),
+    ('site', 'station'), ('stage', 'phase'), ('run_id', 'run'),
     ('idx', 'no'), ('code', 'code'), ('confidence', 'conf'),
     ('sense', 'sense'), ('strike', 'strike'), ('dip', 'dip'),
     ('dipaz', 'dip az'), ('rake', 'rake'),
@@ -334,7 +355,7 @@ def write_faults(recs, outdir):
         for i, d in enumerate(r.get('_records') or [], start=1):
             dipaz = d.get('dipaz')
             rows.append({
-                'run_id': r['run_id'], 'site_name': r['site_name'],
+                'run_id': r['run_id'], 'site': r['site'],
                 'stage': r.get('stage', ''), 'idx': i,
                 'code': d.get('code', ''),
                 'confidence': d.get('confidence', ''),
@@ -363,7 +384,7 @@ def write_map(recs, outdir):
     for r in recs:
         (mapped if (r.get('longitude') and r.get('latitude'))
          else missing).append(r)
-    cols = ['run_id', 'site_name', 'stage', 'n', 'longitude', 'latitude',
+    cols = ['site', 'stage', 'run_id', 'n', 'longitude', 'latitude',
             'h_axis', 'h_trend', 'h_plunge', 'h_usable', 'phi']
     with io.open(os.path.join(outdir, 'map_points.csv'), 'w',
                  encoding='utf-8', newline='') as fh:

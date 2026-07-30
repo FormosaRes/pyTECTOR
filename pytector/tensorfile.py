@@ -205,6 +205,51 @@ def read_info_lambda(path):
     return out
 
 
+#: One printed solution block: a header, three axes, then the ratio.
+#:     SOLUTION INVDIR (NO 2)  LAMBDA= 0.45
+#:     AXIS SIGMA 1     D=  17.     P=  48.
+#:     ...
+#:     RATIO PHI= 0.490   [(S2-S3)/(S1-S3)]
+_BLOCK = re.compile(
+    r'SOLUTION\s+(INVDIR|PSIDIR)([^\n]*)\n'      # 1 name, 2 rest of header
+    r'(.*?)'                                      # 3 whatever sits between
+    r'RATIO\s+PHI=\s*([\d.]+)',                   # 4 the ratio
+    re.S)
+_AXIS = re.compile(
+    r'AXIS\s+SIGMA\s*([123])\s+D=\s*([\d.]+)\.?\s+P=\s*([\d.]+)')
+
+
+def read_info_solutions(path):
+    """Both solution blocks INFO1 prints, with their axes.
+
+    Returns {'INVDIR': block, 'PSIDIR': block} for whichever are present:
+
+        sigma1/2/3  (trend, plunge)
+        phi         that block's RATIO PHI
+        flag        the text after the block name, e.g. 'PERMUTATION',
+                    'AXES OK !', or '(NO 2)  LAMBDA= 0.45'
+        permuted    True when the header says PERMUTATION
+
+    Why this is needed at all. `parse_result_line` reads the 03 line, and on
+    85 of the 93 archive runs carrying all three values that line's Phi is
+    PSIDIR's, never INVDIR's alone. So the 03 line cannot tell you what INVDIR
+    said, and anything that records INVDIR values has to come from here.
+    """
+    with open(path, 'r', errors='replace') as fh:
+        txt = fh.read()
+    out = {}
+    for m in _BLOCK.finditer(txt):
+        name, rest, middle, phi = m.groups()
+        block = dict(phi=float(phi), flag=rest.strip(),
+                     permuted='PERMUT' in rest.upper())
+        for a in _AXIS.finditer(rest + '\n' + middle):
+            idx, trend, plunge = a.groups()
+            block['sigma%s' % idx] = (float(trend) % 360.0, float(plunge))
+        if all(('sigma%d' % i) in block for i in (1, 2, 3)):
+            out[name] = block
+    return out
+
+
 def discover(root):
     """Find every TENSOR run under a directory tree.
 

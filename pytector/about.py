@@ -45,7 +45,8 @@ seismological data (1994, fig. 4.44).
 
 Maintainer  Chi-Hsiu Pang
 Repository  github.com/FormosaRes/pyTECTOR
-Licence     not yet chosen; treat as all rights reserved
+Licence     MIT. The method is Angelier's; the opening drawing is his
+            published figure and is not distributed with the code.
 
 Requires numpy, scipy, matplotlib, PyQt5.
 """

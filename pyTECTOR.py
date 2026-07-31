@@ -421,8 +421,12 @@ class Main(QtWidgets.QMainWindow):
         a.setToolTip('Write everything to one file so none of it has to be '
                      'entered or inverted again.')
         a.triggered.connect(self.save_session)
-        tb.addAction('Scan folder').triggered.connect(self.scan_folder)
-        tb.addAction('Clear').triggered.connect(self.clear_all)
+        # 'Scan folder' and 'Clear' were here. The first opened a folder only
+        # to show a bare list of paths; the Survey window lists the same runs
+        # with their numbers beside them and a double click opens one, so the
+        # button was the worse way in. The second is covered twice over:
+        # Open site replaces everything, and the fault table's own Delete
+        # takes a selection, so select-all-Delete empties it.
         tb.addSeparator()
         self.cb_a = QtWidgets.QCheckBox('INVDIR')
         self.cb_a.setChecked(True)
@@ -939,13 +943,6 @@ class Main(QtWidgets.QMainWindow):
             self.results = {}
             self._refresh()
 
-    def clear_all(self):
-        self.records, self.results, self.archive = [], {}, None
-        self.site_name = '01'
-        self.ed_site.setText('01')
-        self.strip_ar.hide()
-        self._refresh()
-        self.entry.focus()
 
     @staticmethod
     def quadrant(dipaz):
@@ -1027,42 +1024,6 @@ class Main(QtWidgets.QMainWindow):
             return
         self._load(fn)
 
-    def scan_folder(self):
-        """Find every run under a folder and offer them in a picker, rather
-        than parking a list in the sidebar that is empty most of the time."""
-        d = QtWidgets.QFileDialog.getExistingDirectory(
-            self, 'Folder containing TENSOR runs')
-        if not d:
-            return
-        found = tensorfile.discover(d)
-        if not found:
-            QtWidgets.QMessageBox.information(
-                self, 'pyTECTOR', 'No TENSOR runs found under that folder.')
-            return
-        dlg = QtWidgets.QDialog(self)
-        dlg.setWindowTitle('%d runs found' % len(found))
-        dlg.resize(560, 460)
-        lay = QtWidgets.QVBoxLayout(dlg)
-        lst = QtWidgets.QListWidget()
-        for p in found:
-            it = QtWidgets.QListWidgetItem(
-                os.path.relpath(p, d).replace('\\', '/'))
-            it.setData(QtCore.Qt.UserRole, p)
-            lst.addItem(it)
-        lst.setCurrentRow(0)
-        lst.itemDoubleClicked.connect(lambda _i: dlg.accept())
-        lay.addWidget(lst)
-        row = QtWidgets.QHBoxLayout()
-        row.addStretch(1)
-        ok = QtWidgets.QPushButton('Open')
-        ok.clicked.connect(dlg.accept)
-        row.addWidget(ok)
-        no = QtWidgets.QPushButton('Cancel')
-        no.clicked.connect(dlg.reject)
-        row.addWidget(no)
-        lay.addLayout(row)
-        if dlg.exec_() and lst.currentItem():
-            self._load(lst.currentItem().data(QtCore.Qt.UserRole))
 
     def _load(self, path):
         try:

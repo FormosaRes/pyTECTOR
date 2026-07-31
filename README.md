@@ -97,8 +97,11 @@ be computed: phase, fault type and the two coordinates.
 
 **Output in the original formats.** INFO1 and MOHR1 are byte-for-byte identical
 to the originals. The HPGL export replays the original drawing procedure rather
-than reimplementing it. The survey exports a table, the fault data, map points
-and the stress axes as GeoJSON line geometry that a GIS opens as a stress map.
+than reimplementing it, and **HPGL is vector**, so the stereogram opens in a
+drawing program as editable curves and text rather than as a picture: see
+[Taking a figure further](#taking-a-figure-further). The survey exports a
+table, the fault data, map points and the stress axes as GeoJSON line geometry
+that a GIS opens as a stress map.
 
 **Session files.** The whole working state is saved as a single JSON file.
 Only the tensor is stored and everything else is recomputed on load, so a saved
@@ -432,6 +435,36 @@ full count and the tie falls to the resultant. On a twenty-five station phase
 that put σ2 ahead of σ3 by three hundredths of R and reported a direction
 ninety degrees from the extension direction. The same trap waits for every
 strike-slip phase. See `pytector/rose.py` for all of it.
+
+## Taking a figure further
+
+**Save PNG** writes a picture. **Save HPGL** writes the same stereogram as
+*vector* output, and that is the one to use when the figure is going into a
+paper: every circle, tick and label arrives as an object that can be
+restyled, recoloured and relabelled, at any size, without going soft.
+
+HPGL is Hewlett-Packard's pen-plotter language from the 1970s. Angelier's
+program wrote it because that is what a plotter took, and the format has
+outlived the hardware precisely because it is simple: plain text, absolute
+coordinates, one pen instruction per line. The export here is a replay of the
+same drawing procedure that draws on screen, so what is plotted and what is
+saved cannot drift apart.
+
+**CorelDRAW** imports it directly: *File ▸ Import*, choose the `.plt`
+extension filter if the file is offered as unknown. That is the route this
+export is checked against, and the one to reach for first.
+
+The format is old enough and simple enough that other vector and CAD packages
+read it too, and there is a well-established free converter,
+[**hp2xx**](https://www.gnu.org/software/hp2xx/), which turns HPGL into SVG,
+PostScript or PDF from the command line and so opens the door to Illustrator
+and Inkscape. Those routes are not tested here; if one of them mangles a
+figure, that is worth reporting.
+
+Two practical notes. Some importers expect the extension `.plt` rather than
+`.hpgl`, and renaming the file is usually the whole fix. And the drawing
+carries no page size of its own, so the first thing to do after importing is
+to scale it to the frame the figure needs.
 
 ## Verification
 

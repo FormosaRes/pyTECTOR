@@ -174,6 +174,11 @@ class SurveyWindow(QtWidgets.QDialog):
             | QtWidgets.QTableWidget.EditKeyPressed
             | QtWidgets.QTableWidget.AnyKeyPressed)
         self.table.itemChanged.connect(self._edited)
+        # Double-click a row to open that run in the main window. This is
+        # where the old "Scan folder" button's job belongs: it opened a folder
+        # only to show a bare list of paths, and this list already has the
+        # numbers next to each one.
+        self.table.itemDoubleClicked.connect(self._open_run)
         split.addWidget(self.table)
 
         tabs = QtWidgets.QTabWidget()
@@ -204,30 +209,36 @@ class SurveyWindow(QtWidgets.QDialog):
 
         bot = QtWidgets.QHBoxLayout()
         bot.setSpacing(6)
+        # Two buttons rather than five. Load used to be three, one per kind of
+        # file, which made the user classify the CSV before opening it when
+        # its own header already says what it is. Save used to be two, and
+        # nobody writes the phases back without the coordinates.
         for text, tip, slot in (
-                ('Load phases...',
-                 'CSV of  run,stage . The key may be the run id, the station '
-                 'or the folder name.', self.load_stages),
-                ('Load coordinates...',
-                 'CSV of  site,longitude,latitude , keyed the same way.',
-                 self.load_coords),
-                ('Import solutions...',
-                 'A CSV of determinations that have no run folder behind '
-                 'them, such as published data being compared against your '
-                 'own. They are marked "imported" in the solution column.',
-                 self.import_solutions),
-                ('Save phases...',
-                 'Write the phase and type columns to py_data/phases.csv, '
-                 'where the next scan picks them up by itself.',
-                 self.save_stages),
-                ('Save coordinates...',
-                 'Write the lon/lat columns to py_data/coordinates.csv, '
-                 'read back the same way.', self.save_coords)):
+                ('Load...',
+                 'Any CSV keyed on the station: phases, coordinates, or whole '
+                 'determinations that have no run folder behind them. Which '
+                 'it is comes from its own column names.', self.load_csv),
+                ('Save...',
+                 'Write the phase, type and coordinate columns back out as '
+                 'phases.csv and coordinates.csv, where the next scan picks '
+                 'them up by itself.', self.save_edits)):
             b = QtWidgets.QPushButton(text)
             b.setToolTip(tip)
             b.clicked.connect(slot)
             bot.addWidget(b)
         bot.addStretch(1)
+        # Its own button as well as being part of Export all. The printed
+        # table is the thing most often wanted on its own, and having it come
+        # out only as one file among nine meant it could not be found.
+        self.btn_table = QtWidgets.QPushButton('Table for a paper...')
+        self.btn_table.setToolTip(
+            'The solution table in the layout journals in this field print: '
+            'site, stage, N, D and P for each axis, the ratio, ANG, RUP and '
+            'Q. LaTeX, Word or Markdown.')
+        self.btn_table.clicked.connect(self.export_table)
+        self.btn_table.setEnabled(False)
+        bot.addWidget(self.btn_table)
+
         self.btn_export = QtWidgets.QPushButton('Export all...')
         self.btn_export.setToolTip(
             'Table, fault data, map points as CSV and GeoJSON, and a rose '
@@ -337,8 +348,40 @@ class SurveyWindow(QtWidgets.QDialog):
             bits.append('%s read from py_data' % ' and '.join(picked))
         self.lbl_head.setText(',  '.join(bits))
         self.btn_export.setEnabled(bool(self.recs))
+        self.btn_table.setEnabled(bool(self.recs))
         self.redraw()
         self.map.set_records(self.recs)
+
+    def _open_run(self, item):
+        """Load the double-clicked run into the main window.
+
+        Only on a read-only column: double-clicking an editable one opens the
+        editor, which is what the user meant by double-clicking it.
+        """
+        if COLUMNS[item.column()][2]:
+            return
+        run_id = self.table.item(item.row(), 0).data(QtCore.Qt.UserRole)
+        rec = next((r for r in self.recs if r['run_id'] == run_id), None)
+        if rec is None:
+            return
+        if not rec.get('folder'):
+            QtWidgets.QMessageBox.information(
+                self, 'pyTECTOR',
+                '%s was imported from a table. There is no run behind it to '
+                'open.' % rec.get('site', ''))
+            return
+        path = os.path.join(rec['folder'], rec['file_name'])
+        if not os.path.exists(path):
+            QtWidgets.QMessageBox.warning(
+                self, 'pyTECTOR', 'The data file has gone:\n\n%s' % path)
+            return
+        main = self.main
+        if main is None or not hasattr(main, '_load'):
+            return
+        main._load(path)
+        main.show()
+        main.raise_()
+        main.activateWindow()
 
     def _edited(self, item):
         if self._filling:
@@ -452,36 +495,62 @@ class SurveyWindow(QtWidgets.QDialog):
                                           'Scan a folder first.')
         return False
 
-    def load_stages(self):
-        if not self._need_recs():
-            return
-        p, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, 'CSV of  run,stage', self.root, 'CSV (*.csv);;All (*)')
-        if p:
-            survey.attach_stages(self.recs, p)
-            self.refresh()
+    def load_csv(self):
+        """One opener for all three kinds, told apart by their own headers.
 
-    def load_coords(self):
-        if not self._need_recs():
-            return
-        p, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, 'CSV of  site,longitude,latitude', self.root,
-            'CSV (*.csv);;All (*)')
-        if p:
-            survey.attach_coords(self.recs, p)
-            self.refresh()
-
-    def import_solutions(self):
-        """Add determinations that have no run behind them.
-
-        Kept separate from a scan rather than merged into one: a rescan
-        rebuilds the list from the folder, and anything imported would vanish
-        with it if it were not held apart.
+        A file that carries stress axes is a set of determinations and is
+        imported as such. Otherwise whatever columns it has are applied to the
+        runs already listed: phase and type, coordinates, or both, since one
+        file often holds both and there was no reason to make that two trips.
         """
         p, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, 'CSV of solutions', PY_DATA, 'CSV (*.csv);;All (*)')
+            self, 'CSV keyed on the station', PY_DATA,
+            'CSV (*.csv);;All (*)')
         if not p:
             return
+        try:
+            with io.open(p, encoding='utf-8-sig', newline='') as fh:
+                head = next(csv.reader(
+                    l for l in fh if not l.lstrip().startswith('#')), [])
+        except Exception as exc:
+            QtWidgets.QMessageBox.warning(self, 'pyTECTOR',
+                                          'Could not read it:\n\n%s' % exc)
+            return
+        cols = {(c or '').strip().lower() for c in head}
+
+        if cols & {'s1_trend', 's2_trend', 's3_trend'}:
+            self._import_solutions(p)
+            return
+        if not self._need_recs():
+            return
+
+        did = []
+        if cols & {'stage', 'phase', 'type', 'regime'}:
+            survey._attach(self.recs, p, ['stage', 'type'], 'phases')
+            did.append('phases')
+        if cols & {'longitude', 'lon', 'latitude', 'lat'}:
+            survey.attach_coords(self.recs, p)
+            did.append('coordinates')
+        if not did:
+            QtWidgets.QMessageBox.information(
+                self, 'pyTECTOR',
+                'Nothing in that file is recognised.\n\nExpected a station '
+                'column plus at least one of: stage, type, longitude, '
+                'latitude, or the s1/s2/s3 trend and plunge columns of a full '
+                'determination.\n\nIts columns: %s'
+                % ', '.join(sorted(c for c in cols if c)))
+            return
+        self.refresh()
+        self.lbl_head.setText('%s read from %s'
+                              % (' and '.join(did), os.path.basename(p)))
+
+    def _import_solutions(self, p):
+        """Add determinations that have no run behind them.
+
+        Kept apart from the scanned records rather than merged into them: a
+        rescan rebuilds the list from the folder, and anything imported would
+        vanish with it if it were not held separately.
+        """
         try:
             rows = survey.read_solutions(p)
         except Exception as exc:
@@ -502,52 +571,94 @@ class SurveyWindow(QtWidgets.QDialog):
                      if r.get('solution_from') != 'imported'] + self.imported
         self.refresh()
 
-    def save_stages(self):
-        """Write the phase and type columns out, so the judgement survives.
+    def save_edits(self):
+        """Write the four typed-in columns back out, both files together.
 
-        Typing a phase for every run is the expensive part of this window and
-        it is the one thing that cannot be recomputed. It goes to a file the
-        moment the user asks, keyed on the station so a rescan can find it.
+        Typing a phase for every station is the expensive part of this window
+        and it is the one thing that cannot be recomputed. It goes back to
+        py_data, which is exactly where the next scan looks, so saving once
+        means it returns by itself.
+
+        Both files rather than one at a time: nobody writes the phases back
+        without the coordinates, and asking twice for one action is how a
+        button row grows to seven.
         """
         if not self._need_recs():
             return
-        # Defaults to py_data/phases.csv, which is exactly where the next scan
-        # looks: save once and the judgement comes back by itself.
-        p, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, 'Save phases', PHASE_FILE, 'CSV (*.csv)')
-        if not p:
+        d = QtWidgets.QFileDialog.getExistingDirectory(
+            self, 'Write phases.csv and coordinates.csv into', PY_DATA)
+        if not d:
             return
-        d = os.path.dirname(p)
-        if d and not os.path.isdir(d):
-            os.makedirs(d)
-        with io.open(p, 'w', encoding='utf-8', newline='') as fh:
+        wrote = []
+
+        n = 0
+        with io.open(os.path.join(d, 'phases.csv'), 'w', encoding='utf-8',
+                     newline='') as fh:
             w = csv.writer(fh)
             w.writerow(['site', 'stage', 'type'])
             for r in self.recs:
-                if str(r.get('stage', '')).strip() or str(r.get('type', '')).strip():
+                if (str(r.get('stage', '')).strip()
+                        or str(r.get('type', '')).strip()):
                     w.writerow([r.get('site', ''), r.get('stage', ''),
                                 r.get('type', '')])
-        self.lbl_head.setText('phases written to %s' % p)
+                    n += 1
+        wrote.append('phases.csv (%d)' % n)
 
-    def save_coords(self):
-        """Write the coordinate columns out, same idea as save_phases."""
-        if not self._need_recs():
-            return
-        p, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, 'Save coordinates', COORD_FILE, 'CSV (*.csv)')
-        if not p:
-            return
-        d = os.path.dirname(p)
-        if d and not os.path.isdir(d):
-            os.makedirs(d)
-        with io.open(p, 'w', encoding='utf-8', newline='') as fh:
+        n = 0
+        with io.open(os.path.join(d, 'coordinates.csv'), 'w',
+                     encoding='utf-8', newline='') as fh:
             w = csv.writer(fh)
             w.writerow(['site', 'longitude', 'latitude'])
             for r in self.recs:
                 if survey._num(r.get('longitude')) is not None:
                     w.writerow([r.get('site', ''), r.get('longitude', ''),
                                 r.get('latitude', '')])
-        self.lbl_head.setText('coordinates written to %s' % p)
+                    n += 1
+        wrote.append('coordinates.csv (%d)' % n)
+        self.lbl_head.setText('%s written to %s' % (' and '.join(wrote), d))
+
+    #: file dialog filter -> the extension write_publication_table produces
+    TABLE_KINDS = [
+        ('Word, keeps the merged header (*.html)', 'html'),
+        ('LaTeX, booktabs (*.tex)', 'tex'),
+        ('Markdown (*.md)', 'md'),
+    ]
+
+    def export_table(self):
+        """Write just the printed table, in whichever of the three is wanted.
+
+        All three are always generated, because they cost nothing and the one
+        that is needed changes with where the table is going; the chooser only
+        decides which name the user is asked for and which is reported back.
+        """
+        if not self._need_recs():
+            return
+        p, chosen = QtWidgets.QFileDialog.getSaveFileName(
+            self, 'Table for a paper',
+            os.path.join(PY_DATA, 'table_publication.html'),
+            ';;'.join(k[0] for k in self.TABLE_KINDS))
+        if not p:
+            return
+        want = dict(self.TABLE_KINDS).get(chosen, 'html')
+        outdir = os.path.dirname(p) or '.'
+        try:
+            n = survey.write_publication_table(
+                self.recs, outdir,
+                caption='Results of palaeostress determination')
+        except Exception as exc:
+            QtWidgets.QMessageBox.warning(self, 'pyTECTOR',
+                                          'Could not write it:\n\n%s' % exc)
+            return
+        # write_publication_table names its own files; if the user typed
+        # something else, put the chosen format under that name too
+        made = os.path.join(outdir, 'table_publication.%s' % want)
+        if os.path.normcase(os.path.abspath(p)) != \
+                os.path.normcase(os.path.abspath(made)):
+            import shutil
+            shutil.copyfile(made, p)
+        self.lbl_head.setText(
+            '%d row(s) written to %s  (.tex, .html and .md all in %s)'
+            % (n, os.path.basename(p), outdir))
 
     def export(self):
         if not self._need_recs():

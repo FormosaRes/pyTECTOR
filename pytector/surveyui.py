@@ -19,7 +19,7 @@ import csv
 import io
 import os
 
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 import matplotlib
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
@@ -57,6 +57,18 @@ COLUMNS = [
 #: what may be typed into the type column. Blank is allowed and means "not
 #: decided", which is different from any of the three.
 TYPES = ['', 'normal', 'thrust', 'strike-slip']
+
+#: the four editable columns are tinted, because they were indistinguishable
+#: from the twelve that are not and so read as a report rather than a form
+EDIT_TINT = QtGui.QColor('#FBF7EC')
+EDIT_HINT = {
+    'stage': 'Which deformation phase. Yours to decide; nothing here guesses '
+             'it. Any label will do, and it groups the roses and the map.',
+    'type': 'normal, thrust or strike-slip, or blank for undecided. It '
+            'decides which axis the phase is read through.',
+    'longitude': 'Decimal degrees, east positive.',
+    'latitude': 'Decimal degrees, north positive.',
+}
 
 
 def _axis_text(rec, i):
@@ -145,6 +157,15 @@ class SurveyWindow(QtWidgets.QDialog):
         self.table.setSelectionBehavior(QtWidgets.QTableWidget.SelectRows)
         self.table.verticalHeader().setVisible(False)
         self.table.setSortingEnabled(True)
+        # A single click on an already-selected cell starts editing. The
+        # default needs a double click, and with the editable columns looking
+        # exactly like the read-only ones there was nothing to suggest they
+        # could be edited at all.
+        self.table.setEditTriggers(
+            QtWidgets.QTableWidget.DoubleClicked
+            | QtWidgets.QTableWidget.SelectedClicked
+            | QtWidgets.QTableWidget.EditKeyPressed
+            | QtWidgets.QTableWidget.AnyKeyPressed)
         self.table.itemChanged.connect(self._edited)
         split.addWidget(self.table)
 
@@ -275,7 +296,12 @@ class SurveyWindow(QtWidgets.QDialog):
                         v = rec.get(key, '')
                         text = '' if v is None else str(v)
                     it = QtWidgets.QTableWidgetItem(text)
-                    if not editable:
+                    if editable:
+                        # tinted so the four columns that are the user's own
+                        # judgement are visibly theirs to change
+                        it.setBackground(EDIT_TINT)
+                        it.setToolTip(EDIT_HINT[key])
+                    else:
                         it.setFlags(it.flags() & ~QtCore.Qt.ItemIsEditable)
                     if col == 0:
                         it.setData(QtCore.Qt.UserRole, rec['run_id'])
@@ -309,9 +335,25 @@ class SurveyWindow(QtWidgets.QDialog):
         row, col = item.row(), item.column()
         key = COLUMNS[col][0]
         run_id = self.table.item(row, 0).data(QtCore.Qt.UserRole)
+        text = item.text().strip()
+
+        # A coordinate has to be a number in range. Without this a slipped
+        # key put a station in the Atlantic and took the whole view with it,
+        # and the only clue was that the map had gone blank.
+        if key in ('longitude', 'latitude') and text:
+            v = survey._num(text)
+            limit = 180.0 if key == 'longitude' else 90.0
+            if v is None or abs(v) > limit:
+                QtWidgets.QMessageBox.warning(
+                    self, 'pyTECTOR',
+                    '%r is not a %s.\n\nDecimal degrees, between -%g and %g.'
+                    % (text, key, limit, limit))
+                self.refresh()
+                return
+
         for rec in self.recs:
             if rec['run_id'] == run_id:
-                rec[key] = item.text().strip()
+                rec[key] = text
                 break
         if key in ('stage', 'type'):
             self.redraw()

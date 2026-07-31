@@ -23,11 +23,12 @@ arbitrary and a map of confident lines that mean nothing is worse than a gap.
 import math
 import os
 
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
+from matplotlib.patches import FancyArrowPatch
 
 from . import basemap, rose, survey
 
@@ -48,6 +49,42 @@ PHASE_COLOURS = ['#1F4E79', '#B03A2E', '#1E8449', '#6C3483', '#B9770E',
 UNASSIGNED = '#8A8A8A'
 
 
+def layers_icon(px=30):
+    """The stacked-sheets mark every web map uses for its layer control.
+
+    Drawn rather than shipped as a file: it is four strokes, and a PNG in the
+    repository would be one more thing to keep in step with the interface's
+    own colours.
+    """
+    img = QtGui.QPixmap(px, px)
+    img.fill(QtCore.Qt.transparent)
+    p = QtGui.QPainter(img)
+    p.setRenderHint(QtGui.QPainter.Antialiasing, True)
+    pen = QtGui.QPen(QtGui.QColor('#1E1E1C'))
+    pen.setWidthF(px * 0.085)
+    pen.setJoinStyle(QtCore.Qt.RoundJoin)
+    p.setPen(pen)
+    p.setBrush(QtCore.Qt.NoBrush)
+    cx, w, h = px / 2.0, px * 0.32, px * 0.17
+    for i, cy in enumerate((px * 0.34, px * 0.53, px * 0.70)):
+        if i == 0:                      # the top sheet is a full diamond
+            path = QtGui.QPainterPath()
+            path.moveTo(cx, cy - h)
+            path.lineTo(cx + w, cy)
+            path.lineTo(cx, cy + h)
+            path.lineTo(cx - w, cy)
+            path.closeSubpath()
+            p.drawPath(path)
+        else:                           # the ones under it are just a chevron
+            path = QtGui.QPainterPath()
+            path.moveTo(cx - w, cy - h * 0.35)
+            path.lineTo(cx, cy + h * 0.55)
+            path.lineTo(cx + w, cy - h * 0.35)
+            p.drawPath(path)
+    p.end()
+    return QtGui.QIcon(img)
+
+
 class MapPanel(QtWidgets.QWidget):
     """Right-hand map. Owns no data: it is handed records and draws them."""
 
@@ -66,69 +103,16 @@ class MapPanel(QtWidgets.QWidget):
 
         row = QtWidgets.QHBoxLayout()
         row.setSpacing(6)
-
-        self.chk_base = QtWidgets.QCheckBox('OpenStreetMap')
-        self.chk_base.setChecked(True)
-        self.chk_base.setToolTip(
-            'Background tiles, cached in py_data/.tilecache after the first '
-            'fetch. Needs the network only the first time for a given area.')
-        self.chk_base.stateChanged.connect(lambda _s: self.redraw(refetch=True))
-        row.addWidget(self.chk_base)
-
-        b = QtWidgets.QPushButton('GeoTIFF...')
-        b.setToolTip('Lay a north-up GeoTIFF under the data. Supported: %s'
-                     % basemap.SUPPORTED)
-        b.clicked.connect(self.load_tif)
-        row.addWidget(b)
-
-        self.btn_clear_tif = QtWidgets.QPushButton('x')
-        self.btn_clear_tif.setFixedWidth(24)
-        self.btn_clear_tif.setToolTip('Remove the GeoTIFF layer')
-        self.btn_clear_tif.clicked.connect(self.clear_tif)
-        self.btn_clear_tif.setEnabled(False)
-        row.addWidget(self.btn_clear_tif)
-
-        lab = QtWidgets.QLabel('opacity')
-        lab.setObjectName('legend')
-        row.addWidget(lab)
-        self.sl_alpha = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        self.sl_alpha.setRange(0, 100)
-        self.sl_alpha.setValue(70)
-        self.sl_alpha.setFixedWidth(90)
-        self.sl_alpha.valueChanged.connect(lambda _v: self.redraw())
-        row.addWidget(self.sl_alpha)
-
-        self.cmb_axis = QtWidgets.QComboBox()
-        self.cmb_axis.addItems(['axis by regime', 'sigma1', 'sigma3',
-                                'sigma1 + sigma3'])
-        self.cmb_axis.setToolTip(
-            'Which axis to draw. By regime means sigma3 for a normal phase '
-            'and sigma1 for a thrust or strike-slip one, decided per phase '
-            'from the type column.')
-        self.cmb_axis.currentIndexChanged.connect(lambda _i: self.redraw())
-        row.addWidget(self.cmb_axis)
-
-        self.cmb_len = QtWidgets.QComboBox()
-        self.cmb_len.addItems(list(LENGTH_STEPS))
-        self.cmb_len.setCurrentText('normal')
-        self.cmb_len.setToolTip(
-            'Length of the axis symbols, relative to the width of the view. '
-            'They scale with the zoom: a fixed ground length disappears under '
-            'the station dot once the whole area is on screen.')
-        self.cmb_len.currentIndexChanged.connect(lambda _i: self.redraw())
-        row.addWidget(self.cmb_len)
-
         b = QtWidgets.QPushButton('Fit')
         b.setToolTip('Zoom to the stations')
         b.clicked.connect(lambda: self.redraw(refit=True, refetch=True))
         row.addWidget(b)
-        row.addStretch(1)
-        lay.addLayout(row)
-
         b = QtWidgets.QPushButton('Save image...')
         b.setToolTip('Write the map as it stands to a PNG')
         b.clicked.connect(self.save_png)
         row.addWidget(b)
+        row.addStretch(1)
+        lay.addLayout(row)
 
         self.fig = Figure(figsize=(6, 7))
         self.canvas = Canvas(self.fig)
@@ -157,6 +141,178 @@ class MapPanel(QtWidgets.QWidget):
         self.lbl.setObjectName('legend')
         self.lbl.setWordWrap(True)
         lay.addWidget(self.lbl)
+
+        self._build_layers()
+
+    # ------------------------------------------------------------ layers --
+    def _build_layers(self):
+        """The layer control, floating over the map as a web map's does.
+
+        A row of checkboxes and combo boxes above the figure was taking the
+        height the map wanted and still did not say what was a layer and what
+        was a drawing option. Here they are grouped and out of the way until
+        the button is pressed.
+        """
+        self.btn_layers = QtWidgets.QToolButton(self.canvas)
+        self.btn_layers.setIcon(layers_icon(30))
+        self.btn_layers.setIconSize(QtCore.QSize(26, 26))
+        self.btn_layers.setFixedSize(36, 36)
+        self.btn_layers.setCursor(QtCore.Qt.ArrowCursor)
+        self.btn_layers.setToolTip('Layers')
+        self.btn_layers.setStyleSheet(
+            'QToolButton{background:rgba(255,255,255,235);'
+            'border:1px solid #C9C4B4;border-radius:18px;}'
+            'QToolButton:hover{background:#FFFFFF;}')
+        self.btn_layers.clicked.connect(self._toggle_layers)
+
+        self.pnl_layers = QtWidgets.QFrame(self.canvas)
+        self.pnl_layers.setStyleSheet(
+            'QFrame{background:rgba(255,255,255,242);'
+            'border:1px solid #C9C4B4;border-radius:6px;}')
+        self.pnl_layers.setVisible(False)
+        v = QtWidgets.QVBoxLayout(self.pnl_layers)
+        v.setContentsMargins(10, 8, 10, 8)
+        v.setSpacing(5)
+
+        def heading(text):
+            la = QtWidgets.QLabel(text)
+            la.setStyleSheet('border:none;color:#7A776F;font-size:10px;')
+            return la
+
+        v.addWidget(heading('BASE MAP'))
+        self.chk_base = QtWidgets.QCheckBox('OpenStreetMap')
+        self.chk_base.setChecked(True)
+        self.chk_base.setStyleSheet('border:none;')
+        self.chk_base.setToolTip(
+            'Tiles, cached in py_data/.tilecache after the first fetch. Needs '
+            'the network only the first time for a given area.')
+        self.chk_base.stateChanged.connect(lambda _s: self.redraw(refetch=True))
+        v.addWidget(self.chk_base)
+
+        v.addWidget(heading('OVERLAY'))
+        rw = QtWidgets.QHBoxLayout()
+        rw.setSpacing(4)
+        self.chk_tif = QtWidgets.QCheckBox('(no raster)')
+        self.chk_tif.setChecked(True)
+        self.chk_tif.setEnabled(False)
+        self.chk_tif.setStyleSheet('border:none;')
+        self.chk_tif.stateChanged.connect(lambda _s: self.redraw())
+        rw.addWidget(self.chk_tif, 1)
+        b = QtWidgets.QToolButton()
+        b.setText('...')
+        b.setToolTip('Load a north-up GeoTIFF. Supported: %s'
+                     % basemap.SUPPORTED)
+        b.clicked.connect(self.load_tif)
+        rw.addWidget(b)
+        self.btn_clear_tif = QtWidgets.QToolButton()
+        self.btn_clear_tif.setText('x')
+        self.btn_clear_tif.setToolTip('Remove the raster')
+        self.btn_clear_tif.setEnabled(False)
+        self.btn_clear_tif.clicked.connect(self.clear_tif)
+        rw.addWidget(self.btn_clear_tif)
+        v.addLayout(rw)
+
+        self.sl_alpha = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.sl_alpha.setRange(0, 100)
+        self.sl_alpha.setValue(70)
+        self.sl_alpha.setToolTip('Raster opacity')
+        self.sl_alpha.setStyleSheet('border:none;')
+        self.sl_alpha.valueChanged.connect(lambda _v: self.redraw())
+        v.addWidget(self.sl_alpha)
+
+        v.addWidget(heading('SYMBOLS'))
+        for w, tip in ((self._combo('cmb_axis',
+                                    ['axis by regime', 'sigma1', 'sigma3',
+                                     'sigma1 + sigma3']),
+                        'Which axis to draw. By regime is sigma3 for a normal '
+                        'phase and sigma1 for a thrust or strike-slip one, '
+                        'decided per phase from the type column.'),
+                       (self._combo('cmb_style',
+                                    ['line', 'arrows']),
+                        'A plain line, or the usual palaeostress arrows: '
+                        'sigma1 pointing inwards for compression, sigma3 '
+                        'outwards for extension.'),
+                       (self._combo('cmb_len', list(LENGTH_STEPS), 'normal'),
+                        'Symbol length, relative to the width of the view.')):
+            w.setToolTip(tip)
+            v.addWidget(w)
+
+        v.addWidget(heading('PHASES'))
+        self.phase_box = QtWidgets.QWidget()
+        self.phase_box.setStyleSheet('border:none;')
+        self.phase_lay = QtWidgets.QVBoxLayout(self.phase_box)
+        self.phase_lay.setContentsMargins(0, 0, 0, 0)
+        self.phase_lay.setSpacing(2)
+        v.addWidget(self.phase_box)
+        self.phase_checks = {}
+
+        rw = QtWidgets.QHBoxLayout()
+        rw.setSpacing(4)
+        for text, on in (('all', True), ('none', False)):
+            b = QtWidgets.QToolButton()
+            b.setText(text)
+            b.clicked.connect(lambda _c, s=on: self._set_all_phases(s))
+            rw.addWidget(b)
+        rw.addStretch(1)
+        v.addLayout(rw)
+        self._place_layers()
+
+    def _combo(self, name, items, current=None):
+        c = QtWidgets.QComboBox()
+        c.addItems(items)
+        if current:
+            c.setCurrentText(current)
+        c.setStyleSheet('border:1px solid #C9C4B4;')
+        c.currentIndexChanged.connect(lambda _i: self.redraw())
+        setattr(self, name, c)
+        return c
+
+    def _toggle_layers(self):
+        self.pnl_layers.setVisible(not self.pnl_layers.isVisible())
+        self._place_layers()
+
+    def _place_layers(self):
+        w = self.canvas.width()
+        self.btn_layers.move(max(6, w - 46), 10)
+        self.btn_layers.raise_()
+        self.pnl_layers.adjustSize()
+        self.pnl_layers.move(max(6, w - self.pnl_layers.width() - 10), 52)
+        self.pnl_layers.raise_()
+
+    def resizeEvent(self, ev):
+        super(MapPanel, self).resizeEvent(ev)
+        self._place_layers()
+
+    def _set_all_phases(self, on):
+        for c in self.phase_checks.values():
+            c.blockSignals(True)
+            c.setChecked(on)
+            c.blockSignals(False)
+        self.redraw()
+
+    def _sync_phase_checks(self, order, counts, colours):
+        """Rebuild the phase list, keeping whatever was already unticked."""
+        want = list(order)
+        if want == list(self.phase_checks):
+            for ph in want:
+                self.phase_checks[ph].setText('%s  (%d)' % (ph, counts[ph]))
+            return
+        prev = {ph: c.isChecked() for ph, c in self.phase_checks.items()}
+        for c in self.phase_checks.values():
+            self.phase_lay.removeWidget(c)
+            c.deleteLater()
+        self.phase_checks = {}
+        for ph in want:
+            c = QtWidgets.QCheckBox('%s  (%d)' % (ph, counts[ph]))
+            c.setChecked(prev.get(ph, True))
+            c.setStyleSheet('border:none;color:%s;' % colours[ph])
+            c.stateChanged.connect(lambda _s: self.redraw())
+            self.phase_lay.addWidget(c)
+            self.phase_checks[ph] = c
+        self._place_layers()
+
+    def visible_phases(self):
+        return {ph for ph, c in self.phase_checks.items() if c.isChecked()}
 
     # ----------------------------------------------------------- gestures --
     def _on_scroll(self, ev):
@@ -243,6 +399,9 @@ class MapPanel(QtWidgets.QWidget):
                 if force is None:
                     return
         self.tif = (img, ext, label, p)
+        self.chk_tif.setText(os.path.basename(p))
+        self.chk_tif.setChecked(True)
+        self.chk_tif.setEnabled(True)
         self.btn_clear_tif.setEnabled(True)
         self.redraw(refit=True, refetch=True)
 
@@ -274,6 +433,8 @@ class MapPanel(QtWidgets.QWidget):
 
     def clear_tif(self):
         self.tif = None
+        self.chk_tif.setText('(no raster)')
+        self.chk_tif.setEnabled(False)
         self.btn_clear_tif.setEnabled(False)
         self.redraw()
 
@@ -281,6 +442,26 @@ class MapPanel(QtWidgets.QWidget):
     def set_records(self, recs):
         self.recs = recs
         self.redraw(refit=True, refetch=True)
+
+    def _arrow_pair(self, mx, my, dx, dy, colour, inward):
+        """The palaeostress arrow pair, both halves of one axis.
+
+        Convention, and it is not decoration: sigma1 is drawn pointing IN
+        towards the station because compression pushes, sigma3 pointing OUT
+        because extension pulls. Two arrows rather than one, for the same
+        reason the plain symbol is a line through the station and not a
+        half-line: an axis has no single sense, and one arrow would assert a
+        direction the data does not contain.
+        """
+        gap = 0.22            # leave the station dot visible in the middle
+        for sx, sy in ((1.0, 1.0), (-1.0, -1.0)):
+            outer = (mx + dx * sx, my + dy * sy)
+            inner = (mx + dx * gap * sx, my + dy * gap * sy)
+            tail, head = (outer, inner) if inward else (inner, outer)
+            self.ax.add_patch(FancyArrowPatch(
+                tail, head, arrowstyle='-|>', mutation_scale=9,
+                color=colour, lw=1.5, zorder=4, shrinkA=0, shrinkB=0,
+                joinstyle='miter'))
 
     def _fill(self, box):
         """Grow a box to the canvas's own shape.
@@ -382,7 +563,7 @@ class MapPanel(QtWidgets.QWidget):
                 self.ax.imshow(img, extent=ext, origin='upper', zorder=0,
                                interpolation='bilinear')
 
-        if self.tif:
+        if self.tif and self.chk_tif.isChecked():
             img, ext, _label, _p = self.tif
             self.ax.imshow(img, extent=ext, origin='upper', zorder=1,
                            alpha=self.sl_alpha.value() / 100.0,
@@ -396,13 +577,22 @@ class MapPanel(QtWidgets.QWidget):
             by_phase.setdefault(str(r.get('stage', '')).strip()
                                 or '(unassigned)', []).append((r, lon, lat))
         order = sorted(by_phase, key=lambda s: (s == '(unassigned)', s))
+        colours = {ph: (UNASSIGNED if ph == '(unassigned)'
+                        else PHASE_COLOURS[i % len(PHASE_COLOURS)])
+                   for i, ph in enumerate(order)}
+        self._sync_phase_checks(order, {p: len(by_phase[p]) for p in order},
+                                colours)
+        shown = self.visible_phases()
+        arrows = self.cmb_style.currentText() == 'arrows'
 
-        drawn = steep = 0
+        drawn = steep = hidden = 0
         handles = []
-        for i, phase in enumerate(order):
+        for phase in order:
             items = by_phase[phase]
-            colour = (UNASSIGNED if phase == '(unassigned)'
-                      else PHASE_COLOURS[i % len(PHASE_COLOURS)])
+            if phase not in shown:
+                hidden += len(items)
+                continue
+            colour = colours[phase]
             labels = self._phase_axis(phase, [r for r, _lo, _la in items])
             px, py = [], []
             for r, lon, lat in items:
@@ -423,13 +613,17 @@ class MapPanel(QtWidgets.QWidget):
                     # applying one would make the symbol a ground length again
                     th = math.radians(t)
                     dx, dy = half * math.sin(th), half * math.cos(th)
-                    # dashed only when both axes are drawn at once, where the
-                    # two would otherwise be indistinguishable
-                    dashed = len(labels) > 1 and lab == 'sigma3'
-                    self.ax.plot([mx - dx, mx + dx], [my - dy, my + dy],
-                                 color=colour, lw=1.7, zorder=4,
-                                 solid_capstyle='round',
-                                 linestyle='--' if dashed else '-')
+                    if arrows:
+                        self._arrow_pair(mx, my, dx, dy, colour,
+                                         inward=(lab == 'sigma1'))
+                    else:
+                        # dashed only when both axes are drawn at once, where
+                        # the two would otherwise be indistinguishable
+                        dashed = len(labels) > 1 and lab == 'sigma3'
+                        self.ax.plot([mx - dx, mx + dx], [my - dy, my + dy],
+                                     color=colour, lw=1.7, zorder=4,
+                                     solid_capstyle='round',
+                                     linestyle='--' if dashed else '-')
                     drawn += 1
             self.ax.plot(px, py, 'o', ms=3.4, color=colour, zorder=5,
                          markeredgecolor='white', markeredgewidth=0.6)
@@ -452,7 +646,9 @@ class MapPanel(QtWidgets.QWidget):
         self.canvas.draw_idle()
 
         bits = ['%d station(s) placed' % len(placed),
-                '%d axis line(s)' % drawn]
+                '%d symbol(s)' % drawn]
+        if hidden:
+            bits.append('%d hidden by the phase filter' % hidden)
         if steep:
             bits.append('%d too steep to draw' % steep)
         if self.tif:

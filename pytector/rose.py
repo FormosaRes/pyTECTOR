@@ -188,6 +188,10 @@ def pick_readable(groups):
     Written because the answer changes between phases and getting it wrong is
     silent: a set whose sigma1 all plunge steeply has an empty compression
     rose and a perfectly good extension one.
+
+    Use `axis_for_regime` instead whenever the fault type is recorded. This
+    function decides on counts, and counts cannot separate two axes that are
+    both horizontal: see the warning there.
     """
     best, best_key = None, None
     for label, axs in groups.items():
@@ -197,3 +201,48 @@ def pick_readable(groups):
         if best_key is None or key > best_key:
             best, best_key = label, key
     return best
+
+
+#: Which axis describes a phase, by the regime its faults record. A
+#: compressional or strike-slip phase is described by the direction it pushed
+#: in, sigma1; an extensional one by the direction it pulled apart, sigma3.
+REGIME_AXIS = {'normal': 'sigma3', 'thrust': 'sigma1', 'reverse': 'sigma1',
+               'strike-slip': 'sigma1', 'strikeslip': 'sigma1',
+               'ss': 'sigma1'}
+
+
+def axis_for_regime(kinds, axes_by_label=None):
+    """Which axis a phase should be read through, from its fault types.
+
+    kinds           iterable of type strings, e.g. 'normal', 'thrust'
+    axes_by_label   optional {label: [(trend, plunge)]}, used only to fall
+                    back when the regime's own axis has nothing shallow
+    returns         (label, reason)
+
+    Prefer this over `pick_readable`. Counting usable axes looks principled
+    and is not: under a normal regime sigma1 is vertical while sigma2 AND
+    sigma3 are both horizontal, so both score the full count and the tie falls
+    to the resultant. On a real 25-station phase that meant sigma2 at R = 0.81
+    beat sigma3 at R = 0.78, and the reported direction came out 90 degrees
+    from the extension direction. Three hundredths of R is not a reason to
+    call one axis the answer.
+
+    The same trap is waiting for any strike-slip phase, where sigma1 and
+    sigma3 are both horizontal by definition.
+    """
+    kinds = [str(k).strip().lower() for k in kinds if k]
+    kinds = [k for k in kinds if k in REGIME_AXIS]
+    if not kinds:
+        if axes_by_label:
+            return pick_readable(axes_by_label), 'no fault type recorded'
+        return None, 'no fault type recorded'
+
+    top = max(set(kinds), key=kinds.count)
+    label = REGIME_AXIS[top]
+    if axes_by_label is not None:
+        trends, _d = shallow_only(axes_by_label.get(label) or [])
+        if not trends:
+            alt = pick_readable(axes_by_label)
+            return alt, ('%s regime reads %s, but none is shallow; showing %s'
+                         % (top, label, alt))
+    return label, '%s regime reads %s' % (top, label)

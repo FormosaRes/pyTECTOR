@@ -508,6 +508,13 @@ class Main(QtWidgets.QMainWindow):
         act.setToolTip('Restore a tilted site in a separate window, measured '
                        'and restored side by side.')
         act.triggered.connect(self.open_backtilt)
+        # This window answers "what is the stress at this site". A study asks
+        # what a whole set of sites says, and that question had no way in from
+        # the interface at all: it lived only in make_survey.py.
+        act = tb.addAction('Survey')
+        act.setToolTip('Many runs at once: assign phases, add coordinates, '
+                       'and get a table, map points and a rose per phase.')
+        act.triggered.connect(self.open_survey)
         tb.addSeparator()
         tb.addAction('Save PNG').triggered.connect(self.save_png)
         tb.addAction('Save HPGL').triggered.connect(self.save_hpgl)
@@ -848,6 +855,20 @@ class Main(QtWidgets.QMainWindow):
         self.bt_window.show()
         self.bt_window.raise_()
         self.bt_window.activateWindow()
+
+    def open_survey(self):
+        """Open the survey window, or raise it if it is already up.
+
+        Kept alive between openings rather than rebuilt: the phase and type
+        columns are the user's own judgement, typed in by hand, and throwing
+        that away because a window was closed would be indefensible.
+        """
+        from pytector import surveyui
+        if getattr(self, 'sv_window', None) is None:
+            self.sv_window = surveyui.SurveyWindow(self)
+        self.sv_window.show()
+        self.sv_window.raise_()
+        self.sv_window.activateWindow()
 
     # -------------------------------------------------------------- data --
     @property

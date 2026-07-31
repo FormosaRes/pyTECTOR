@@ -48,6 +48,7 @@ Every record keeps `solution_from` so a table can say which was used.
 import csv
 import io
 import json
+import math
 import os
 import re
 from collections import OrderedDict, defaultdict
@@ -212,19 +213,35 @@ def _horizontal(rec):
 
 
 def _key_index(recs):
-    """Look-ups by run id, station (folder) and file name.
+    """Look-ups by name, in two tiers.
 
-    The file name is accepted because some older lists use it, but it is
-    ambiguous: two runs can hold files of the same name. A key that resolves
-    to more than one run is applied to all of them and the caller is told, so
-    an ambiguous key can never quietly land on the wrong run.
+    Returns (primary, secondary). The primary index is keyed on the run id and
+    the station (folder) name, both of which identify a run. The secondary is
+    keyed on the file name inside the folder, which does not: `MY1` and `MY`
+    both hold a file called MY, and `LY-15`, `LY-15-1` and `LY-15-2` all hold
+    one called LY-15.
+
+    Callers must try the primary first and only fall back to the secondary.
+    Merging the two and taking whatever matched meant a row keyed `MY` landed
+    on the station MY1 as well, and the values only came out right because
+    MY1's own row happened to be read first. Nothing should depend on the
+    order of rows in a CSV.
+
+    A run is also reachable by three names of which two are very often the
+    same string, so each tier de-duplicates: without that, every such key
+    reported itself as ambiguous, which on a 47-station folder was 18 warnings
+    about conflicts that did not exist.
     """
-    idx = {}
+    primary, secondary = {}, {}
     for r in recs:
-        for key in (r['run_id'], r['site'], r.get('file_name')):
+        for key in {r['run_id'], r['site']}:
             if key:
-                idx.setdefault(str(key), []).append(r)
-    return idx
+                primary.setdefault(str(key), []).append(r)
+    for r in recs:
+        key = r.get('file_name')
+        if key and str(key) not in primary:
+            secondary.setdefault(str(key), []).append(r)
+    return primary, secondary
 
 
 def _attach(recs, path, columns, label):
@@ -234,7 +251,7 @@ def _attach(recs, path, columns, label):
     its site name and its folder name, so counting hits reported "2 matched"
     for a single run.
     """
-    idx = _key_index(recs)
+    primary, secondary = _key_index(recs)
     touched, unmatched, ambiguous = set(), [], []
     with io.open(path, encoding='utf-8-sig', newline='') as fh:
         for row in csv.DictReader(fh):
@@ -243,7 +260,9 @@ def _attach(recs, path, columns, label):
             key = row.get('run') or row.get('site') or row.get('run_id')
             if not key:
                 continue
-            targets = idx.get(key)
+            # run id and station name first; the file name only when neither
+            # names anything, because it is not unique
+            targets = primary.get(key) or secondary.get(key)
             if not targets:
                 unmatched.append(key)
                 continue
@@ -409,6 +428,68 @@ def write_map(recs, outdir):
     return mapped, missing
 
 
+#: half-length of a plotted stress axis, in metres on the ground
+AXIS_HALF_LENGTH_M = 700.0
+#: metres per degree of latitude, near enough anywhere for a map symbol
+_M_PER_DEG = 111320.0
+
+
+def write_stress_axes(recs, outdir, half_m=AXIS_HALF_LENGTH_M,
+                      axes=('sigma1', 'sigma3')):
+    """GeoJSON of the stress axes as LINES, for a GIS to draw directly.
+
+    map_points.geojson carries the trend as an attribute, which leaves the
+    reader to set up a rotated marker before anything points anywhere. This
+    writes the geometry itself: a segment centred on the station and lying
+    along the axis, so the layer draws as a stress map the moment it is opened.
+
+    The segment runs both ways from the station because a stress axis has no
+    arrowhead. 020 and 200 are the same line, and a half-line would assert a
+    direction the data does not contain.
+
+    Only shallow axes are drawn. The trend of a steeply plunging axis is
+    close to arbitrary, and a map full of confident little lines that mean
+    nothing is worse than a gap. Which ones were dropped is returned.
+    """
+    feats, drawn, skipped = [], 0, []
+    for r in recs:
+        lon, lat = _num(r.get('longitude')), _num(r.get('latitude'))
+        if lon is None or lat is None:
+            continue
+        for label in axes:
+            i = int(label[-1])
+            trend = _num(r.get('s%d_trend' % i))
+            plunge = _num(r.get('s%d_plunge' % i))
+            if trend is None or plunge is None:
+                continue
+            if plunge >= rose.SHALLOW_LIMIT:
+                skipped.append((r.get('site', ''), label, plunge))
+                continue
+            # trend is measured clockwise from north, so north is +lat and
+            # east is +lon; longitude degrees shrink with latitude
+            th = math.radians(trend)
+            dlat = (half_m * math.cos(th)) / _M_PER_DEG
+            dlon = (half_m * math.sin(th)) / (
+                _M_PER_DEG * max(0.05, math.cos(math.radians(lat))))
+            feats.append(dict(
+                type='Feature',
+                geometry=dict(type='LineString', coordinates=[
+                    [lon - dlon, lat - dlat], [lon + dlon, lat + dlat]]),
+                properties=dict(
+                    site=r.get('site', ''), stage=r.get('stage', ''),
+                    type=r.get('type', ''), axis=label,
+                    trend=round(trend), plunge=round(plunge),
+                    n=r.get('n', ''), phi=r.get('phi', ''),
+                    run_id=r.get('run_id', ''))))
+            drawn += 1
+
+    path = os.path.join(outdir, 'stress_axes.geojson')
+    io.open(path, 'w', encoding='utf-8', newline='\n').write(
+        json.dumps(dict(type='FeatureCollection', features=feats),
+                   ensure_ascii=False, indent=1) + '\n')
+    return drawn, skipped
+
+
 def write_roses(recs, outdir, bin_deg=10.0):
     """One rose figure per phase, sigma1 and sigma3 side by side.
 
@@ -439,7 +520,18 @@ def write_roses(recs, outdir, bin_deg=10.0):
                 if t is not None and p is not None:
                     pairs.append((t, p))
             groups[label] = pairs
-        read = rose.pick_readable(groups)
+
+        # Decide on the regime where the fault type is recorded, and fall back
+        # to counting only when it is not. Counting cannot separate two axes
+        # that are both horizontal, which is every strike-slip phase; see
+        # rose.axis_for_regime for the case that exposed it.
+        by_sigma = {'sigma1': groups['sigma1  compression'],
+                    'sigma3': groups['sigma3  extension']}
+        pick, _why = rose.axis_for_regime([r.get('type') for r in items],
+                                          by_sigma)
+        read = ({'sigma1': 'sigma1  compression',
+                 'sigma3': 'sigma3  extension'}.get(pick)
+                or rose.pick_readable(groups))
 
         fig, axes = plt.subplots(1, 2, figsize=(7.0, 3.9),
                                  subplot_kw=dict(projection='polar'))
@@ -480,6 +572,7 @@ def write_all(recs, outdir, bin_deg=10.0):
     write_table(recs, outdir)
     faults = write_faults(recs, outdir)
     mapped, missing = write_map(recs, outdir)
+    drawn, steep = write_stress_axes(recs, outdir)
     figs = write_roses(recs, outdir, bin_deg)
     print('\n%d runs -> %s' % (len(recs), outdir))
     print('  survey.csv / survey.md          one row per run')
@@ -487,6 +580,9 @@ def write_all(recs, outdir, bin_deg=10.0):
           % len(faults))
     print('  map_points.csv / map_points.geojson   %d with coordinates, '
           '%d without' % (len(mapped), len(missing)))
+    print('  stress_axes.geojson            %d axis line(s) a GIS can draw '
+          'as they are%s' % (drawn, '' if not steep
+                             else ', %d too steep to draw' % len(steep)))
     print('  %d rose figure(s) + roses.md' % len(figs))
     unassigned = [r for r in recs if not r.get('stage')]
     if unassigned:

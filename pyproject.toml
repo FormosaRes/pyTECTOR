@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pytector"
-version = "0.3.1"
+version = "0.4.0"
 description = "Python reconstruction of J. Angelier's TENSOR palaeostress inversion program (TENSOR 5.45, jan91)"
 readme = "README.md"
 requires-python = ">=3.8"

@@ -2,11 +2,51 @@
 
 Versions of pyTECTOR. English first, 中文在後。
 
-Back to the [README](../README.md) · 回到 [README](../README.md)。
+Back to the [README](README.md) · 回到 [README](README.zh.md)。
 
 ---
 
 ## English
+
+**0.4.0**
+
+- **a Survey window**, on the toolbar. The main window answers what the stress
+  is at one site; this one takes a whole folder of TENSOR runs and puts every
+  one in a table with its axes, Φ, ANG and RUP. The station is the folder
+  name, not the file inside it, because on a real archive those disagree on
+  more than half the runs and the file name is not even unique
+- **four columns are editable, and they are the four that cannot be
+  computed**: phase, fault type, longitude and latitude. They are tinted so
+  the table reads as a form rather than a report. Assign a phase and the roses
+  and the map redraw. Nothing here ever guesses a phase
+- **a map beside the table**, OpenStreetMap underneath and one symbol per
+  station drawn along its stress axis. Wheel to zoom, drag to pan. A layer
+  control holds the base map, the raster overlay, the symbol options and a
+  tick box per phase, so one phase can be looked at on its own
+- **arrows as well as lines.** σ1 points in towards the station because
+  compression pushes, σ3 points out because extension pulls; two arrows either
+  way, because an axis has no single sense
+- **GeoTIFF overlay**, read with Pillow rather than by adding rasterio or
+  GDAL. EPSG 4326, 3857, 3826 (TWD97 TM2) and 32651 (UTM 51N), including the
+  common case where the projection is spelled out in the file's own GeoKeys
+  instead of being named. Anything else is refused by name and offered a
+  manual choice: a raster silently offset by a few hundred metres looks right,
+  which is what makes it worse than none
+- **`stress_axes.geojson`** in the export, the axes as line geometry rather
+  than as an attribute, so a GIS opens it as a stress map with no styling
+- **`py_data/`**, a working folder beside the program. Drop run folders in,
+  put `coordinates.csv` and `phases.csv` next to them, and both are picked up
+  on every scan. The whole tree is gitignored: it is field data
+- `rose.axis_for_regime` decides which axis a phase is read through from the
+  **fault type** rather than by counting usable axes. Counting cannot separate
+  two axes that are both horizontal, which is every strike-slip phase and both
+  horizontal axes of a normal one; on a 25-station phase it chose σ2 over σ3
+  by three hundredths of R and reported a direction ninety degrees out
+- **fixed**: a phases or coordinates CSV keyed on the station name could land
+  on the wrong run, because a run is also reachable by the file name inside it
+  and that name is not unique. The values came out right only because the rows
+  happened to be in a helpful order. Run id and folder name are tried first
+  now, and eighteen ambiguity warnings that were never real have gone
 
 **0.3.1**
 
@@ -70,6 +110,40 @@ Back to the [README](../README.md) · 回到 [README](../README.md)。
 - desktop interface, 1991 mode
 
 ## 中文
+
+**0.4.0**
+
+- **新增 Survey 視窗**，在工具列。主視窗回答「這一站的應力是什麼」，
+  這個視窗接手整個資料夾：把每一個 TENSOR run 列成一張表，
+  含三軸、Φ、ANG、RUP。測站以**資料夾名稱**為準而非裡面的檔名 ——
+  在真實 archive 上兩者有超過一半不一致，而且檔名並不唯一
+- **四個欄位可以編輯，而且正是四個算不出來的欄位**：分期、斷層型式、
+  經度、緯度。這四欄有底色，讓表格讀起來像表單而不是報表。
+  指定分期後玫瑰圖與地圖即時重畫。**分期永遠不會被猜。**
+- **表格旁邊就是地圖**，底下鋪 OpenStreetMap，每一站沿其應力軸畫一個符號。
+  滾輪縮放、拖曳平移。圖層控制收納底圖、疊圖、符號選項，
+  以及**各期一個勾選框**，可以只看某一期
+- **除了線段也可以用箭頭。** σ₁ 向內指向測站，因為壓縮是推；
+  σ₃ 向外背離測站，因為張力是拉。兩端都畫箭頭，因為軸沒有單一指向
+- **GeoTIFF 疊圖**，用 Pillow 讀取而非引入 rasterio 或 GDAL。
+  支援 EPSG 4326、3857、3826（TWD97 TM2）與 32651（UTM 51N），
+  包含投影寫在檔案 GeoKey 裡而非用代碼命名的常見情形。
+  其餘一律具名拒絕並提供手動選擇：一張悄悄偏移幾百公尺的底圖看起來是對的，
+  這正是它比沒有底圖更糟的原因
+- 匯出新增 **`stress_axes.geojson`**，應力軸是**線幾何**而非屬性欄位，
+  GIS 打開就是一張應力方向圖，不必設定任何符號樣式
+- 新增 **`py_data/`** 工作資料夾。把 run 資料夾丟進去，
+  旁邊放 `coordinates.csv` 與 `phases.csv`，每次掃描都會自動讀入。
+  整棵樹都在 gitignore 裡：那是野外資料
+- `rose.axis_for_regime` 改以**斷層型式**決定該期讀哪一個軸，
+  而非比較可用軸的數量。數量無法區分兩個都水平的軸 ——
+  平移期的 σ₁ 與 σ₃ 都水平，正斷層期的 σ₂ 與 σ₃ 也都水平。
+  在一個 25 站的期別上，舊規則以 R 差 0.03 選了 σ₂ 而非 σ₃，
+  報出來的方向偏了 90°
+- **修正**：以站名為鍵的分期或座標 CSV 可能套用到錯誤的 run，
+  因為 run 也能用其內部檔名查到，而檔名並不唯一。
+  先前結果正確只是因為 CSV 的列序剛好幫了忙。
+  現在優先比對 run id 與資料夾名稱，同時消除了 18 個從來就不存在的歧義警告
 
 **0.3.1**
 

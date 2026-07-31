@@ -13,9 +13,10 @@
 Rebuilt from the published method, and checked against the original program's own output
 
 [![TENSOR](https://img.shields.io/badge/TENSOR%205.45-reconstructed-1f6feb)](docs/mesure_oracle.md)
-[![version](https://img.shields.io/badge/version-0.3.1-brightgreen)](pyproject.toml)
-[![python](https://img.shields.io/badge/python-3.x-555)](#quick-start)
-[![tests](https://img.shields.io/badge/tests-11%20suites%20passing-2ea44f)](tests/)
+[![version](https://img.shields.io/badge/version-0.4.0-brightgreen)](CHANGELOG.md)
+[![python](https://img.shields.io/badge/python-3.8%2B-555)](#quick-start)
+[![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-555)](#quick-start)
+[![tests](https://img.shields.io/badge/tests-12%20suites%20passing-2ea44f)](tests/)
 [![licence](https://img.shields.io/badge/licence-MIT-8250df)](LICENSE)
 
 [English manual](docs/manual.en.md) · [使用手冊 中文](docs/manual.zh.md) · [Transcript of the original program](docs/mesure_oracle.md)
@@ -88,9 +89,16 @@ and the inversion repeated, giving the leave-one-out residuals ANG\* and RUP\*.
 Both the all-data and the leave-one-out results are written side by side into
 the exported INFO1.
 
+**A survey window, for a whole archive at once.** Point it at a folder of
+TENSOR runs and every one is in a table with its axes, Φ, ANG and RUP, beside a
+map with the axes drawn where they were measured and a rose for each
+deformation phase. Four columns are editable and they are the four that cannot
+be computed: phase, fault type and the two coordinates.
+
 **Output in the original formats.** INFO1 and MOHR1 are byte-for-byte identical
 to the originals. The HPGL export replays the original drawing procedure rather
-than reimplementing it.
+than reimplementing it. The survey exports a table, the fault data, map points
+and the stress axes as GeoJSON line geometry that a GIS opens as a stress map.
 
 **Session files.** The whole working state is saved as a single JSON file.
 Only the tensor is stored and everything else is recomputed on load, so a saved
@@ -348,21 +356,82 @@ surface, and the angle, stay with the user.
 ## Surveying many runs
 
 A single inversion answers one site. The question a study actually asks is what
-a whole set of them says, which is what `make_survey.py` and `pytector.survey`
-are for. Point them at a tree of TENSOR run folders and they produce a table of
-every solution, the fault data behind them, map-ready points as CSV and
-GeoJSON, and an axial rose for each deformation phase.
+a whole set of them says, and until version 0.4.0 that question could only be
+reached from a script. **Survey** on the toolbar opens it.
 
-Two side files are optional and are yours: a CSV of `run,stage` saying which
-run belongs to which phase, and a CSV of `site,longitude,latitude`. Which phase
-a determination belongs to is a judgement, and nothing here guesses it.
+Point it at a folder of TENSOR runs, nested however they lie, and every one
+appears in a table: station, n, which solution was taken, Φ, ANG, RUP and the
+three axes. The station is the **folder** name rather than the file inside it.
+On a real archive those two disagree on more than half the runs, and the file
+name is not even unique: two different runs can each hold a file called
+`LL-3B`, so keying on it merges them.
+
+Four columns are editable, and they are exactly the four that cannot be
+computed:
+
+| column | why it is yours |
+|---|---|
+| phase | which deformation phase a run belongs to is a judgement. **Nothing here guesses it**; with none assigned the rose panel says so rather than inventing groups |
+| type | normal, thrust or strike-slip. It decides which axis the phase is read through |
+| longitude, latitude | where the station is |
+
+They are tinted, so the table reads as a form rather than a report. Everything
+else is computed and stays plain. Assign a phase and the roses and the map
+redraw as you type.
+
+`py_data/` beside the program is where runs are dropped, with `coordinates.csv`
+and `phases.csv` next to them; both are read on every scan and can be written
+back from the window, so the judgement typed into those columns survives a
+rescan. The whole folder is gitignored, because it is field data.
+
+The command-line route is still there, and does the same work without the
+interface:
+
+```
+python make_survey.py [root] [outdir] --stages phases.csv --coords coords.csv
+```
+
+### The map
+
+Underneath is OpenStreetMap, cached after the first fetch. Over it, one symbol
+per station along its stress axis, coloured by phase. Wheel to zoom, drag to
+pan.
+
+The symbol is a line through the station, or the usual palaeostress arrows:
+**σ1 pointing in** because compression pushes, **σ3 pointing out** because
+extension pulls. Two arrows either way, for the same reason the line runs
+through the station rather than out of it: an axis has no single sense, and one
+arrow would assert a direction the data does not contain. Axes plunging past
+45° are left out rather than drawn, because their trend is close to arbitrary.
+
+The layer control holds the base map, a GeoTIFF overlay, the symbol options and
+a tick box per phase, so a single phase can be looked at on its own. A
+twenty-five station phase drawn over a three station one hides it completely.
+
+A GeoTIFF is read with Pillow rather than by adding rasterio or GDAL, which are
+large and awkward to install and would break the four-package promise the
+installer makes. It must be north-up and in EPSG 4326, 3857, 3826 (TWD97 TM2)
+or 32651 (UTM 51N), including the common case where the projection is spelled
+out in the file's own GeoKeys instead of being named. Anything else is refused
+by name and offered a manual choice rather than being placed on a guess: a
+raster silently offset by a few hundred metres looks right, which is what makes
+it worse than none at all.
+
+### Roses
 
 The rose diagrams are axial rather than directional, because a stress axis has
 no arrowhead: 020 and 200 are the same line, so the doubled-angle method is
 used and the two ends reinforce instead of cancelling. A trend is only treated
 as a direction when its axis is shallow; steeper axes are dropped and the count
-of what was dropped is printed on the figure rather than left implicit. See
-`pytector/rose.py` for both decisions in full.
+of what was dropped is printed on the figure rather than left implicit.
+
+Which axis a phase is read through comes from the **fault type**, not from
+counting which axis has more usable members. Counting looks principled and is
+not: under a normal regime σ2 and σ3 are both horizontal, so both score the
+full count and the tie falls to the resultant. On a twenty-five station phase
+that put σ2 ahead of σ3 by three hundredths of R and reported a direction
+ninety degrees from the extension direction. The same trap waits for every
+strike-slip phase. See `pytector/rose.py` for all of it.
 
 ## Verification
 

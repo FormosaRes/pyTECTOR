@@ -13,9 +13,10 @@
 依已發表的方法重建，並以原程式自身的輸出檔案驗證
 
 [![TENSOR](https://img.shields.io/badge/TENSOR%205.45-reconstructed-1f6feb)](docs/mesure_oracle.md)
-[![version](https://img.shields.io/badge/version-0.3.1-brightgreen)](pyproject.toml)
-[![python](https://img.shields.io/badge/python-3.x-555)](#安裝與執行)
-[![tests](https://img.shields.io/badge/tests-11%20suites%20passing-2ea44f)](tests/)
+[![version](https://img.shields.io/badge/version-0.4.0-brightgreen)](CHANGELOG.md)
+[![python](https://img.shields.io/badge/python-3.8%2B-555)](#安裝與執行)
+[![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-555)](#安裝與執行)
+[![tests](https://img.shields.io/badge/tests-12%20suites%20passing-2ea44f)](tests/)
 [![licence](https://img.shields.io/badge/licence-MIT-8250df)](LICENSE)
 
 [使用手冊 中文](docs/manual.zh.md) · [English manual](docs/manual.en.md) · [原程式對話全文](docs/mesure_oracle.md)
@@ -76,8 +77,15 @@ pyTECTOR 執行同一套運算、讀寫同一批檔案、繪製同一種圖，
 程式對每一筆資料執行 leave-one-out 重新反演，輸出剔除後殘差 ANG\* 與 RUP\*，
 並將「全部資料」與「剔除該筆後」兩組結果並列寫入匯出的 INFO1。
 
+**Survey 視窗，一次處理整個 archive。** 指向一個放 TENSOR run 的資料夾，
+每一個 run 都會列進表格（三軸、Φ、ANG、RUP），旁邊是把應力軸畫在實測位置上的地圖，
+以及各變形期的玫瑰圖。四個欄位可編輯，正是四個算不出來的欄位：
+分期、斷層型式，以及經緯度。
+
 **原格式輸出。** INFO1 與 MOHR1 與原始檔案逐位元組相同；
 HPGL 匯出係重播原本的繪圖程序，而非另一套獨立實作。
+Survey 則匯出總表、斷層資料、地圖點位，
+以及**線幾何形式**的應力軸 GeoJSON，GIS 打開就是一張應力方向圖。
 
 **Session 存檔。** 全部工作狀態存為單一 JSON 檔。檔中僅保存張量，
 其餘數值於載入時重新計算，因此存檔中的 Φ 不可能與存檔中的張量互相矛盾。
@@ -283,19 +291,69 @@ CS - 122 - 87W - 124
 ## 多站彙整
 
 單次反演回答的是一個站。一項研究真正要問的是一整批站說了什麼，
-這即是 `make_survey.py` 與 `pytector.survey` 的用途。將它們指向一棵
-TENSOR run 資料夾樹，即可產出全部解答的表格、其背後的斷層資料、
-可直接投圖的點位（CSV 與 GeoJSON），以及各變形期的軸向玫瑰圖。
+而在 0.4.0 之前，這個問題只能從命令列去問。工具列的 **Survey** 打開它。
 
-兩個側邊檔案為選用，且屬於使用者自己的判斷：`run,stage` 的 CSV 指出哪一個 run
-屬於哪一期，以及 `site,longitude,latitude` 的座標 CSV。
-**一個解屬於哪一期是判斷而非計算，程式不會替你猜。**
+指向一個放 TENSOR run 的資料夾（巢狀多深都可以），每一個 run 都會出現在表格裡：
+站名、n、採用了哪個解、Φ、ANG、RUP，以及三個軸。
+測站以**資料夾名稱**為準而非裡面的檔名 ——
+在真實 archive 上兩者有超過一半不一致，而且檔名並不唯一：
+兩個不同的 run 可以各自含一個叫 `LL-3B` 的檔案，用檔名當鍵會把它們併成一個。
+
+四個欄位可編輯，正是四個算不出來的欄位:
+
+| 欄位 | 為什麼歸你決定 |
+|---|---|
+| phase | 一個解屬於哪一期是判斷。**程式不會替你猜**；沒有指定時玫瑰圖區塊會直接說明，而不是自行分組 |
+| type | normal／thrust／strike-slip，決定該期讀哪一個軸 |
+| longitude, latitude | 測站位置 |
+
+這四欄有底色，讓表格讀起來像表單而非報表；其餘欄位是算出來的，維持原樣。
+指定分期後，玫瑰圖與地圖會隨著你打字即時重畫。
+
+程式旁邊的 `py_data/` 是丟資料的地方，`coordinates.csv` 與 `phases.csv` 放在旁邊，
+每次掃描都會讀入，也可以從視窗寫回去 —— 手打進那四欄的判斷不會因為重新掃描而白費。
+整個資料夾都在 gitignore 裡，因為那是野外資料。
+
+命令列的路徑仍然保留，做同樣的事:
+
+```
+python make_survey.py [根目錄] [輸出夾] --stages phases.csv --coords coords.csv
+```
+
+### 地圖
+
+底下鋪 OpenStreetMap，第一次抓取後會快取。上面每一站沿其應力軸畫一個符號，
+依分期上色。滾輪縮放、拖曳平移。
+
+符號可以是穿過測站的線段，也可以是慣用的古應力箭頭：
+**σ₁ 向內**因為壓縮是推，**σ₃ 向外**因為張力是拉。
+兩端都畫箭頭，理由和線段穿過測站而不是從測站射出去一樣：
+**軸沒有單一指向，只畫一個箭頭等於宣稱資料裡沒有的東西。**
+傾伏超過 45° 的軸不畫，因為那種軸的 trend 近乎任意。
+
+圖層控制收納底圖、GeoTIFF 疊圖、符號選項，以及**各期一個勾選框**，
+可以單獨檢視某一期 —— 25 站的期別畫在 3 站的期別上面會把它整個蓋掉。
+
+GeoTIFF 以 Pillow 讀取，而非引入 rasterio 或 GDAL：那兩者都很大、
+在 Windows 上難裝，而且會破壞安裝器「只裝四個套件」的承諾。
+影像須為**北方朝上**，投影須為 EPSG 4326、3857、3826（TWD97 TM2）
+或 32651（UTM 51N），包含投影寫在檔案 GeoKey 裡而非用代碼命名的常見情形。
+其餘一律具名拒絕並提供手動選擇，而不是靠猜測擺上去：
+一張悄悄偏移幾百公尺的底圖看起來是對的，這正是它比沒有底圖更糟的原因。
+
+### 玫瑰圖
 
 玫瑰圖採軸向而非方向統計，因為應力軸沒有箭頭：020 與 200 是同一條線，
 故採倍角法，使兩端互相加強而非互相抵消。
-此外，唯有淺傾的軸其 trend 才視為方向；較陡的軸會被剔除，
+唯有淺傾的軸其 trend 才視為方向；較陡的軸會被剔除，
 且剔除了幾個會直接印在圖上而非默默略過。
-兩項決定的完整說明見 `pytector/rose.py`。
+
+一期該讀哪一個軸，取決於**斷層型式**，而非比較哪個軸的可用數較多。
+比數量看似有原則，其實不然：正斷層情境下 σ₂ 與 σ₃ 都水平，
+兩者可用數相同，勝負落到 R 值。
+在一個 25 站的期別上，這讓 σ₂ 以 0.03 的差距勝過 σ₃，
+報出來的方向與真正的張力方向差了 90°。平移期有完全相同的陷阱。
+完整說明見 `pytector/rose.py`。
 
 ## 驗證
 

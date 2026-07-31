@@ -25,7 +25,7 @@ import matplotlib
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
 
-from . import rose, survey
+from . import mappanel, rose, survey
 
 #: The working data folder, beside the program. Old-format TENSOR runs get
 #: dropped into DATA_DIR, one folder per station, and the two side files sit
@@ -139,7 +139,7 @@ class SurveyWindow(QtWidgets.QDialog):
 
         split = QtWidgets.QSplitter(QtCore.Qt.Vertical)
 
-        self.table = QtWidgets.QTableWidget(0, len(COLUMNS))
+        self.table = QtWidgets.QTableWidget(0, len(COLUMNS))  # noqa: E501
         self.table.setHorizontalHeaderLabels([c[1] for c in COLUMNS])
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QtWidgets.QTableWidget.SelectRows)
@@ -161,7 +161,18 @@ class SurveyWindow(QtWidgets.QDialog):
         tabs.addTab(self.summary, 'By phase')
         split.addWidget(tabs)
         split.setSizes([520, 330])
-        lay.addWidget(split, 1)
+
+        # Table and roses on the left, the map on the right. A stress
+        # direction is a spatial claim and a column of azimuths cannot be read
+        # as one; side by side, editing a phase moves both at once.
+        self.map = mappanel.MapPanel(self)
+        outer = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
+        outer.addWidget(split)
+        outer.addWidget(self.map)
+        outer.setStretchFactor(0, 3)
+        outer.setStretchFactor(1, 2)
+        outer.setSizes([820, 560])
+        lay.addWidget(outer, 1)
 
         bot = QtWidgets.QHBoxLayout()
         bot.setSpacing(6)
@@ -290,6 +301,7 @@ class SurveyWindow(QtWidgets.QDialog):
         self.lbl_head.setText(',  '.join(bits))
         self.btn_export.setEnabled(bool(self.recs))
         self.redraw()
+        self.map.set_records(self.recs)
 
     def _edited(self, item):
         if self._filling:
@@ -304,6 +316,12 @@ class SurveyWindow(QtWidgets.QDialog):
         if key in ('stage', 'type'):
             self.redraw()
             self.refresh_counts()
+            self.map.redraw()
+        elif key in ('longitude', 'latitude'):
+            # a station that has just been given a position must appear, and
+            # the view has to grow to include it
+            self.refresh_counts()
+            self.map.redraw(refit=True, refetch=True)
 
     def refresh_counts(self):
         staged = sum(1 for r in self.recs if str(r.get('stage', '')).strip())

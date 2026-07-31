@@ -58,9 +58,13 @@ COLUMNS = [
 #: decided", which is different from any of the three.
 TYPES = ['', 'normal', 'thrust', 'strike-slip']
 
-#: the four editable columns are tinted, because they were indistinguishable
-#: from the twelve that are not and so read as a report rather than a form
-EDIT_TINT = QtGui.QColor('#FBF7EC')
+#: What belongs in each editable column, shown on hover.
+#:
+#: These four were tinted for a while so they would not look like the twelve
+#: read-only ones. On a table that already stripes its rows the extra colour
+#: turned the whole grid muddy, and it was worse than the problem it solved.
+#: The heading carries a pencil instead, which marks the column without
+#: touching any of the cells.
 EDIT_HINT = {
     'stage': 'Which deformation phase. Yours to decide; nothing here guesses '
              'it. Any label will do, and it groups the roses and the map.',
@@ -151,8 +155,11 @@ class SurveyWindow(QtWidgets.QDialog):
 
         split = QtWidgets.QSplitter(QtCore.Qt.Vertical)
 
-        self.table = QtWidgets.QTableWidget(0, len(COLUMNS))  # noqa: E501
-        self.table.setHorizontalHeaderLabels([c[1] for c in COLUMNS])
+        self.table = QtWidgets.QTableWidget(0, len(COLUMNS))
+        # a pencil on the four headings that can be typed into, rather than
+        # colouring the cells themselves
+        self.table.setHorizontalHeaderLabels(
+            [(c[1] + '  ✎') if c[2] else c[1] for c in COLUMNS])
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QtWidgets.QTableWidget.SelectRows)
         self.table.verticalHeader().setVisible(False)
@@ -204,6 +211,11 @@ class SurveyWindow(QtWidgets.QDialog):
                 ('Load coordinates...',
                  'CSV of  site,longitude,latitude , keyed the same way.',
                  self.load_coords),
+                ('Import solutions...',
+                 'A CSV of determinations that have no run folder behind '
+                 'them, such as published data being compared against your '
+                 'own. They are marked "imported" in the solution column.',
+                 self.import_solutions),
                 ('Save phases...',
                  'Write the phase and type columns to py_data/phases.csv, '
                  'where the next scan picks them up by itself.',
@@ -259,7 +271,9 @@ class SurveyWindow(QtWidgets.QDialog):
                     if prev.get(k, '') != '':
                         r[k] = prev[k]
             r.setdefault('type', '')
-        self.recs = recs
+        # a rescan rebuilds the list from the folder; imported rows have no
+        # folder to be rebuilt from, so they are carried across by hand
+        self.recs = recs + list(getattr(self, 'imported', []))
 
         # Pick up the side files without being asked. Typing a phase for every
         # station is the expensive part of this window, and having to remember
@@ -297,9 +311,6 @@ class SurveyWindow(QtWidgets.QDialog):
                         text = '' if v is None else str(v)
                     it = QtWidgets.QTableWidgetItem(text)
                     if editable:
-                        # tinted so the four columns that are the user's own
-                        # judgement are visibly theirs to change
-                        it.setBackground(EDIT_TINT)
                         it.setToolTip(EDIT_HINT[key])
                     else:
                         it.setFlags(it.flags() & ~QtCore.Qt.ItemIsEditable)
@@ -459,6 +470,37 @@ class SurveyWindow(QtWidgets.QDialog):
         if p:
             survey.attach_coords(self.recs, p)
             self.refresh()
+
+    def import_solutions(self):
+        """Add determinations that have no run behind them.
+
+        Kept separate from a scan rather than merged into one: a rescan
+        rebuilds the list from the folder, and anything imported would vanish
+        with it if it were not held apart.
+        """
+        p, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, 'CSV of solutions', PY_DATA, 'CSV (*.csv);;All (*)')
+        if not p:
+            return
+        try:
+            rows = survey.read_solutions(p)
+        except Exception as exc:
+            QtWidgets.QMessageBox.warning(self, 'pyTECTOR',
+                                          'Could not read that file:\n\n%s'
+                                          % exc)
+            return
+        if not rows:
+            QtWidgets.QMessageBox.information(
+                self, 'pyTECTOR',
+                'No rows in that file had a site name.')
+            return
+        have = {r['run_id'] for r in self.recs}
+        self.imported = [r for r in getattr(self, 'imported', [])
+                         if r['run_id'] not in {x['run_id'] for x in rows}]
+        self.imported += [r for r in rows if r['run_id'] not in have]
+        self.recs = [r for r in self.recs
+                     if r.get('solution_from') != 'imported'] + self.imported
+        self.refresh()
 
     def save_stages(self):
         """Write the phase and type columns out, so the judgement survives.

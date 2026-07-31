@@ -289,6 +289,59 @@ def _attach(recs, path, columns, label):
     return applied, unmatched
 
 
+#: columns read_solutions understands. Only site is required.
+IMPORT_COLS = {
+    'site': 'site', 'station': 'site', 'no': 'site', 'name': 'site',
+    'stage': 'stage', 'phase': 'stage',
+    'type': 'type', 'regime': 'type',
+    'n': 'n', 'phi': 'phi', 'rap': 'phi',
+    'ang': 'ANG', 'rup': 'RUP',
+    'longitude': 'longitude', 'lon': 'longitude',
+    'latitude': 'latitude', 'lat': 'latitude',
+    's1_trend': 's1_trend', 's1_plunge': 's1_plunge',
+    's2_trend': 's2_trend', 's2_plunge': 's2_plunge',
+    's3_trend': 's3_trend', 's3_plunge': 's3_plunge',
+    'source': 'source', 'note': 'note',
+}
+
+
+def read_solutions(path, source=None):
+    """Solutions from a CSV, for data that has no run folder behind it.
+
+    Published determinations arrive as a table, not as a TENSOR archive, and
+    comparing them against one's own is an ordinary thing to want. Rows here
+    carry the same keys `collect` produces, so the table, the roses, the map
+    and the export all treat them the same way.
+
+    What they do NOT carry is a run. `solution_from` is set to 'imported' and
+    the fault data is absent, so nothing downstream can claim these numbers
+    are traceable to an inversion this program can repeat. That distinction
+    is the whole reason for the separate field.
+    """
+    label = source or os.path.splitext(os.path.basename(path))[0]
+    out = []
+    with io.open(path, encoding='utf-8-sig', newline='') as fh:
+        for i, row in enumerate(csv.DictReader(
+                l for l in fh if not l.lstrip().startswith('#'))):
+            rec = dict(run_id='%s/%d' % (label, i + 1), folder='',
+                       file_name='', site_code='', n='',
+                       has_hpgl=False, has_mesure_key=False,
+                       stage='', type='', longitude='', latitude='',
+                       solution_from='imported', source=label,
+                       permutation='', fit_from='')
+            for key, value in row.items():
+                k = IMPORT_COLS.get((key or '').strip().lower())
+                if k:
+                    rec[k] = (value or '').strip()
+            if not str(rec.get('site', '')).strip():
+                continue
+            rec.update(_horizontal(rec))
+            out.append(rec)
+    print('%s: %d solution(s) imported from %s'
+          % (label, len(out), os.path.basename(path)))
+    return out
+
+
 def attach_stages(recs, path):
     """Apply a `run,stage` CSV. Keys may be run id, site name or folder."""
     return _attach(recs, path, ['stage'], 'stages')
@@ -567,15 +620,122 @@ def write_roses(recs, outdir, bin_deg=10.0):
     return written
 
 
+#: the columns a palaeostress table carries in this literature, in this order
+_PUB = [('site', 'Site'), ('stage', 'Stage'), ('n', 'N'),
+        ('s1_trend', 'D'), ('s1_plunge', 'P'),
+        ('s2_trend', 'D'), ('s2_plunge', 'P'),
+        ('s3_trend', 'D'), ('s3_plunge', 'P'),
+        ('phi', 'RAP'), ('ANG', 'ANG'), ('RUP', 'RUP'), ('q', 'Q')]
+
+
+def _pub_rows(recs):
+    """Values formatted as the printed table wants them, strings throughout."""
+    rows = []
+    for r in sorted(recs, key=lambda x: (str(x.get('stage', '')),
+                                         str(x.get('site', '')))):
+        out = []
+        for key, _head in _PUB:
+            v = r.get(key, '')
+            if key == 'phi':
+                v = '' if _num(v) is None else '%.2f' % _num(v)
+            elif key in ('ANG', 'RUP') or key.endswith(('_trend', '_plunge')):
+                v = '' if _num(v) is None else '%.0f' % _num(v)
+            out.append('' if v is None else str(v))
+        rows.append(out)
+    return rows
+
+
+def write_publication_table(recs, outdir, caption=None):
+    """The solution table in the three shapes a paper actually needs.
+
+    Journals in this field print one table and it always has the same shape:
+    site, stage, N, then D and P for each of the three axes under a spanning
+    header, then the ratio, the two fit measures and a quality letter. That
+    layout is reproduced rather than invented, because a reader of this
+    literature knows where to look on it.
+
+    LaTeX with booktabs for a manuscript, HTML because pasting it into Word
+    keeps the merged header that a CSV cannot carry, and Markdown for notes.
+    None of the three is a spreadsheet: survey.csv is already that, and a
+    table meant for print has different needs from one meant for sorting.
+    """
+    rows = _pub_rows(recs)
+    cap = caption or 'Results of palaeostress determination'
+    n_stage = len({r[1] for r in rows if r[1]})
+
+    tex = ['% requires \\usepackage{booktabs}',
+           '\\begin{table}[htbp]', '\\centering',
+           '\\caption{%s}' % cap,
+           '\\begin{tabular}{llr rr rr rr rrr c}', '\\toprule',
+           '& & & \\multicolumn{2}{c}{Axe $\\sigma_1$}'
+           ' & \\multicolumn{2}{c}{Axe $\\sigma_2$}'
+           ' & \\multicolumn{2}{c}{Axe $\\sigma_3$} & & & & \\\\',
+           '\\cmidrule(lr){4-5}\\cmidrule(lr){6-7}\\cmidrule(lr){8-9}',
+           'Site & Stage & $N$ & $D$ & $P$ & $D$ & $P$ & $D$ & $P$'
+           ' & RAP $\\Phi$ & ANG & RUP & $Q$ \\\\', '\\midrule']
+    for r in rows:
+        tex.append(' & '.join(v.replace('&', '\\&') for v in r) + ' \\\\')
+    tex += ['\\bottomrule', '\\end{tabular}', '\\end{table}']
+    io.open(os.path.join(outdir, 'table_publication.tex'), 'w',
+            encoding='utf-8', newline='\n').write('\n'.join(tex) + '\n')
+
+    html = ['<meta charset="utf-8">',
+            '<table cellspacing="0" style="border-collapse:collapse;'
+            'font-family:Times New Roman,serif;font-size:10pt">',
+            '<caption style="text-align:left;padding:4px 0">%s</caption>'
+            % cap,
+            '<tr><td colspan="3" style="border-top:1.2pt solid #000"></td>'
+            '<td colspan="2" style="border-top:1.2pt solid #000;'
+            'border-bottom:0.5pt solid #000;text-align:center">Axe &sigma;<sub>1</sub></td>'
+            '<td colspan="2" style="border-top:1.2pt solid #000;'
+            'border-bottom:0.5pt solid #000;text-align:center">Axe &sigma;<sub>2</sub></td>'
+            '<td colspan="2" style="border-top:1.2pt solid #000;'
+            'border-bottom:0.5pt solid #000;text-align:center">Axe &sigma;<sub>3</sub></td>'
+            '<td colspan="4" style="border-top:1.2pt solid #000"></td></tr>',
+            '<tr>' + ''.join(
+                '<th style="border-bottom:0.5pt solid #000;padding:2px 7px;'
+                'text-align:%s;font-weight:normal;font-style:%s">%s</th>'
+                % ('left' if i < 2 else 'right',
+                   'italic' if h in ('D', 'P', 'N', 'Q') else 'normal',
+                   'RAP &Phi;' if h == 'RAP' else h)
+                for i, (_k, h) in enumerate(_PUB)) + '</tr>']
+    for r in rows:
+        html.append('<tr>' + ''.join(
+            '<td style="padding:2px 7px;text-align:%s">%s</td>'
+            % ('left' if i < 2 else 'right', v)
+            for i, v in enumerate(r)) + '</tr>')
+    html += ['<tr><td colspan="%d" style="border-bottom:1.2pt solid #000">'
+             '</td></tr>' % len(_PUB), '</table>']
+    io.open(os.path.join(outdir, 'table_publication.html'), 'w',
+            encoding='utf-8', newline='\n').write('\n'.join(html) + '\n')
+
+    md = ['# %s' % cap, '',
+          '| Site | Stage | N | σ1 D | σ1 P | σ2 D | σ2 P | σ3 D | σ3 P '
+          '| RAP Φ | ANG | RUP | Q |',
+          '|---|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|:-:|']
+    for r in rows:
+        md.append('| ' + ' | '.join(r) + ' |')
+    md += ['', '%d determination(s)%s. D is trend and P is plunge, both in '
+                'degrees. RAP Φ is the shape ratio; ANG and RUP are the mean '
+                'fit measures.'
+           % (len(rows), ', %d phase(s)' % n_stage if n_stage else '')]
+    io.open(os.path.join(outdir, 'table_publication.md'), 'w',
+            encoding='utf-8', newline='\n').write('\n'.join(md) + '\n')
+    return len(rows)
+
+
 def write_all(recs, outdir, bin_deg=10.0):
     os.makedirs(outdir, exist_ok=True)
     write_table(recs, outdir)
     faults = write_faults(recs, outdir)
+    npub = write_publication_table(recs, outdir)
     mapped, missing = write_map(recs, outdir)
     drawn, steep = write_stress_axes(recs, outdir)
     figs = write_roses(recs, outdir, bin_deg)
     print('\n%d runs -> %s' % (len(recs), outdir))
     print('  survey.csv / survey.md          one row per run')
+    print('  table_publication.tex / .html / .md   %d row(s), journal layout'
+          % npub)
     print('  faults.csv                     %d fault data across all runs'
           % len(faults))
     print('  map_points.csv / map_points.geojson   %d with coordinates, '

@@ -620,12 +620,21 @@ def write_roses(recs, outdir, bin_deg=10.0):
     return written
 
 
-#: the columns a palaeostress table carries in this literature, in this order
-_PUB = [('site', 'Site'), ('stage', 'Stage'), ('n', 'N'),
+#: the columns a palaeostress table carries in this literature, in this order.
+#: Position sits next to the site name because that is where a reader looks
+#: for it, and four decimal places is about 11 m, which is finer than any of
+#: these stations is actually known to.
+_PUB = [('site', 'Site'),
+        ('longitude', 'Long.'), ('latitude', 'Lat.'),
+        ('stage', 'Stage'), ('n', 'N'),
         ('s1_trend', 'D'), ('s1_plunge', 'P'),
         ('s2_trend', 'D'), ('s2_plunge', 'P'),
         ('s3_trend', 'D'), ('s3_plunge', 'P'),
         ('phi', 'RAP'), ('ANG', 'ANG'), ('RUP', 'RUP'), ('q', 'Q')]
+
+#: where the three spanning headers sit: (label, first column, last column)
+_PUB_SPANS = [('Axe $\\sigma_1$', 5, 6), ('Axe $\\sigma_2$', 7, 8),
+              ('Axe $\\sigma_3$', 9, 10)]
 
 
 def _pub_rows(recs):
@@ -636,7 +645,9 @@ def _pub_rows(recs):
         out = []
         for key, _head in _PUB:
             v = r.get(key, '')
-            if key == 'phi':
+            if key in ('longitude', 'latitude'):
+                v = '' if _num(v) is None else '%.4f' % _num(v)
+            elif key == 'phi':
                 v = '' if _num(v) is None else '%.2f' % _num(v)
             elif key in ('ANG', 'RUP') or key.endswith(('_trend', '_plunge')):
                 v = '' if _num(v) is None else '%.0f' % _num(v)
@@ -661,18 +672,24 @@ def write_publication_table(recs, outdir, caption=None):
     """
     rows = _pub_rows(recs)
     cap = caption or 'Results of palaeostress determination'
-    n_stage = len({r[1] for r in rows if r[1]})
+    # by name, not by position. Inserting the two coordinate columns moved
+    # every index after Site, and the phase count silently became a count of
+    # distinct longitudes: 30 where there were five phases.
+    col = {k: i for i, (k, _h) in enumerate(_PUB)}
+    n_stage = len({r[col['stage']] for r in rows if r[col['stage']]})
 
     tex = ['% requires \\usepackage{booktabs}',
-           '\\begin{table}[htbp]', '\\centering',
+           '\\begin{table}[htbp]', '\\centering', '\\small',
            '\\caption{%s}' % cap,
-           '\\begin{tabular}{llr rr rr rr rrr c}', '\\toprule',
-           '& & & \\multicolumn{2}{c}{Axe $\\sigma_1$}'
-           ' & \\multicolumn{2}{c}{Axe $\\sigma_2$}'
-           ' & \\multicolumn{2}{c}{Axe $\\sigma_3$} & & & & \\\\',
-           '\\cmidrule(lr){4-5}\\cmidrule(lr){6-7}\\cmidrule(lr){8-9}',
-           'Site & Stage & $N$ & $D$ & $P$ & $D$ & $P$ & $D$ & $P$'
-           ' & RAP $\\Phi$ & ANG & RUP & $Q$ \\\\', '\\midrule']
+           '\\begin{tabular}{l rr l r rr rr rr rrr c}', '\\toprule',
+           '& & & & & '
+           + ' & '.join('\\multicolumn{2}{c}{%s}' % lab
+                        for lab, _a, _b in _PUB_SPANS)
+           + ' & & & & \\\\',
+           ''.join('\\cmidrule(lr){%d-%d}' % (a + 1, b + 1)
+                   for _lab, a, b in _PUB_SPANS),
+           'Site & Long. & Lat. & Stage & $N$ & $D$ & $P$ & $D$ & $P$'
+           ' & $D$ & $P$ & RAP $\\Phi$ & ANG & RUP & $Q$ \\\\', '\\midrule']
     for r in rows:
         tex.append(' & '.join(v.replace('&', '\\&') for v in r) + ' \\\\')
     tex += ['\\bottomrule', '\\end{tabular}', '\\end{table}']
@@ -684,41 +701,42 @@ def write_publication_table(recs, outdir, caption=None):
             'font-family:Times New Roman,serif;font-size:10pt">',
             '<caption style="text-align:left;padding:4px 0">%s</caption>'
             % cap,
-            '<tr><td colspan="3" style="border-top:1.2pt solid #000"></td>'
-            '<td colspan="2" style="border-top:1.2pt solid #000;'
-            'border-bottom:0.5pt solid #000;text-align:center">Axe &sigma;<sub>1</sub></td>'
-            '<td colspan="2" style="border-top:1.2pt solid #000;'
-            'border-bottom:0.5pt solid #000;text-align:center">Axe &sigma;<sub>2</sub></td>'
-            '<td colspan="2" style="border-top:1.2pt solid #000;'
-            'border-bottom:0.5pt solid #000;text-align:center">Axe &sigma;<sub>3</sub></td>'
-            '<td colspan="4" style="border-top:1.2pt solid #000"></td></tr>',
+            '<tr><td colspan="5" style="border-top:1.2pt solid #000"></td>'
+            + ''.join(
+                '<td colspan="2" style="border-top:1.2pt solid #000;'
+                'border-bottom:0.5pt solid #000;text-align:center">'
+                'Axe &sigma;<sub>%d</sub></td>' % i for i in (1, 2, 3))
+            + '<td colspan="4" style="border-top:1.2pt solid #000"></td></tr>',
             '<tr>' + ''.join(
                 '<th style="border-bottom:0.5pt solid #000;padding:2px 7px;'
                 'text-align:%s;font-weight:normal;font-style:%s">%s</th>'
-                % ('left' if i < 2 else 'right',
+                % ('left' if i == 0 else 'right',
                    'italic' if h in ('D', 'P', 'N', 'Q') else 'normal',
                    'RAP &Phi;' if h == 'RAP' else h)
                 for i, (_k, h) in enumerate(_PUB)) + '</tr>']
     for r in rows:
         html.append('<tr>' + ''.join(
             '<td style="padding:2px 7px;text-align:%s">%s</td>'
-            % ('left' if i < 2 else 'right', v)
+            % ('left' if i == 0 else 'right', v)
             for i, v in enumerate(r)) + '</tr>')
     html += ['<tr><td colspan="%d" style="border-bottom:1.2pt solid #000">'
              '</td></tr>' % len(_PUB), '</table>']
     io.open(os.path.join(outdir, 'table_publication.html'), 'w',
             encoding='utf-8', newline='\n').write('\n'.join(html) + '\n')
 
+    placed = sum(1 for r in rows if r[col['longitude']])
     md = ['# %s' % cap, '',
-          '| Site | Stage | N | σ1 D | σ1 P | σ2 D | σ2 P | σ3 D | σ3 P '
-          '| RAP Φ | ANG | RUP | Q |',
-          '|---|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|:-:|']
+          '| Site | Long. | Lat. | Stage | N | σ1 D | σ1 P | σ2 D | σ2 P '
+          '| σ3 D | σ3 P | RAP Φ | ANG | RUP | Q |',
+          '|---|--:|--:|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|:-:|']
     for r in rows:
         md.append('| ' + ' | '.join(r) + ' |')
-    md += ['', '%d determination(s)%s. D is trend and P is plunge, both in '
-                'degrees. RAP Φ is the shape ratio; ANG and RUP are the mean '
-                'fit measures.'
-           % (len(rows), ', %d phase(s)' % n_stage if n_stage else '')]
+    md += ['', '%d determination(s)%s, %d with coordinates. Longitude and '
+                'latitude are decimal degrees, WGS84. D is trend and P is '
+                'plunge, both in degrees. RAP Φ is the shape ratio; ANG and '
+                'RUP are the mean fit measures.'
+           % (len(rows), ', %d phase(s)' % n_stage if n_stage else '',
+              placed)]
     io.open(os.path.join(outdir, 'table_publication.md'), 'w',
             encoding='utf-8', newline='\n').write('\n'.join(md) + '\n')
     return len(rows)

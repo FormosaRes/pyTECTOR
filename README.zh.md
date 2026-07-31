@@ -13,7 +13,7 @@
 依已發表的方法重建，並以原程式自身的輸出檔案驗證
 
 [![TENSOR](https://img.shields.io/badge/TENSOR%205.45-reconstructed-1f6feb)](docs/mesure_oracle.md)
-[![version](https://img.shields.io/badge/version-0.4.0-brightgreen)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-0.4.1-brightgreen)](CHANGELOG.md)
 [![python](https://img.shields.io/badge/python-3.8%2B-555)](#安裝與執行)
 [![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-555)](#安裝與執行)
 [![tests](https://img.shields.io/badge/tests-12%20suites%20passing-2ea44f)](tests/)

@@ -8,6 +8,36 @@ Back to the [README](README.md) · 回到 [README](README.zh.md)。
 
 ## English
 
+**0.4.1**
+
+- **`Table for a paper...`**, its own button. The printed table existed only as
+  one file among nine inside Export all, which is to say it could not be found
+- the printed table now carries **longitude and latitude**, next to the site
+  name where a reader looks for them
+- **seven buttons became four.** Load was three, one per kind of CSV, which
+  made the user classify a file before opening it when its own header already
+  says what it is; one opener now reads the columns and applies whatever is
+  there, both kinds at once when a file carries both. Save was two, and nobody
+  writes the phases back without the coordinates
+- **`Scan folder` and `Clear` have gone from the main toolbar.** The first
+  opened a folder only to list bare paths; the survey window lists the same
+  runs with their numbers beside them, and **a double click on a row now opens
+  one**, so the capability moved rather than disappeared. The second is covered
+  twice over already, by Open site replacing everything and by the fault
+  table's own Delete
+- **both READMEs now say what an HPGL file is for.** Save PNG gives a picture,
+  Save HPGL gives vector, and for a figure going into a paper that difference
+  is the point. CorelDRAW imports it directly and is the route this export is
+  checked against; hp2xx is named as the free converter that opens the
+  Illustrator and Inkscape route, and marked as untested here
+- the editable columns are **no longer tinted**. On a table that already
+  stripes its rows the extra colour turned the grid muddy; the heading carries
+  a pencil instead, which marks the column without touching any cell
+- **fixed**: inserting the coordinate columns moved every index after Site, and
+  the caption line read the phase count out of a fixed position, reporting
+  thirty phases where there were five. Both summary figures are looked up by
+  column name now
+
 **0.4.0**
 
 - **a Survey window**, on the toolbar. The main window answers what the stress
@@ -16,9 +46,8 @@ Back to the [README](README.md) · 回到 [README](README.zh.md)。
   name, not the file inside it, because on a real archive those disagree on
   more than half the runs and the file name is not even unique
 - **four columns are editable, and they are the four that cannot be
-  computed**: phase, fault type, longitude and latitude. They are tinted so
-  the table reads as a form rather than a report. Assign a phase and the roses
-  and the map redraw. Nothing here ever guesses a phase
+  computed**: phase, fault type, longitude and latitude. Assign a phase and
+  the roses and the map redraw. Nothing here ever guesses a phase
 - **a map beside the table**, OpenStreetMap underneath and one symbol per
   station drawn along its stress axis. Wheel to zoom, drag to pan. A layer
   control holds the base map, the raster overlay, the symbol options and a
@@ -111,6 +140,29 @@ Back to the [README](README.md) · 回到 [README](README.zh.md)。
 
 ## 中文
 
+**0.4.1**
+
+- **`Table for a paper...` 有自己的按鈕了。** 期刊格式表格先前只存在於
+  `Export all` 的九個輸出之一，等於找不到
+- 期刊格式表格加入**經緯度**，放在站名後面 —— 讀者看完站名接著就想知道在哪
+- **七顆按鈕變四顆。** Load 原本一種 CSV 一顆，等於要使用者先替檔案分類，
+  可是檔案的標題列本來就寫著它是什麼；現在一顆讀欄位自己判斷，
+  同一個檔同時有分期和座標就一次套用。Save 原本兩顆，
+  但沒有人只存分期不存座標
+- **主視窗的 `Scan folder` 與 `Clear` 移除。** 前者只是開個資料夾列出一堆路徑，
+  而 Survey 視窗列的是同樣那些 run 且旁邊有數字，
+  **雙擊任一列即可開啟該 run**，能力是搬家不是消失。
+  後者本來就重複：`Open site` 會整個換掉，斷層表自己也有 `Delete`
+- **兩份 README 補上 HPGL 的用途說明。** Save PNG 是圖片、Save HPGL 是向量，
+  要放進論文的圖，這個差別就是重點。CorelDRAW 可直接匯入，
+  也是本匯出實際驗證過的路徑；另點名 hp2xx 這個免費轉檔工具
+  （打通 Illustrator 與 Inkscape），並明白標示**未經實測**
+- 可編輯欄位**不再上底色**。在已經有斑馬紋的表格上再加顏色會讓整片變糊；
+  改成在欄位標題加一支筆，標示得出來又不碰任何儲存格
+- **修正**：插入座標欄後，其後所有欄位的索引都位移，
+  而註腳是用寫死的位置取分期數，結果報出 30 期（實際 5 期）。
+  兩個統計數字都改用欄名查表
+
 **0.4.0**
 
 - **新增 Survey 視窗**，在工具列。主視窗回答「這一站的應力是什麼」，
@@ -118,8 +170,7 @@ Back to the [README](README.md) · 回到 [README](README.zh.md)。
   含三軸、Φ、ANG、RUP。測站以**資料夾名稱**為準而非裡面的檔名 ——
   在真實 archive 上兩者有超過一半不一致，而且檔名並不唯一
 - **四個欄位可以編輯，而且正是四個算不出來的欄位**：分期、斷層型式、
-  經度、緯度。這四欄有底色，讓表格讀起來像表單而不是報表。
-  指定分期後玫瑰圖與地圖即時重畫。**分期永遠不會被猜。**
+  經度、緯度。指定分期後玫瑰圖與地圖即時重畫。**分期永遠不會被猜。**
 - **表格旁邊就是地圖**，底下鋪 OpenStreetMap，每一站沿其應力軸畫一個符號。
   滾輪縮放、拖曳平移。圖層控制收納底圖、疊圖、符號選項，
   以及**各期一個勾選框**，可以只看某一期

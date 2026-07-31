@@ -25,11 +25,23 @@
 
 ## 1. 安裝與啟動
 
-**一鍵安裝**：雙擊 repo 根目錄的 **`install.bat`**。它會自己找 Python
-（優先 Anaconda）、裝好四個依賴（numpy、scipy、matplotlib、PyQt5）、
+**請先裝 Anaconda 或 Miniconda。** 各平台都強烈建議：可以避開 Microsoft Store
+的 `python` 樁（PyQt5 在它底下不能用，這是安裝失敗最常見的原因），
+而且 scipy 與 Qt 都以預先編譯好的二進位檔提供，不需要現場編譯。
+Miniconda 就夠了。<https://www.anaconda.com/download/success>，
+預設選項就好，不需要管理員權限，也不用勾「Add to PATH」。
+
+**一鍵安裝**：雙擊 repo 根目錄的 **`install.bat`**，
+macOS 與 Linux 則跑 **`install.command`**。兩者都會自己找 Python
+（優先 Anaconda 與 Miniconda，並排除 Store 樁）、裝好四個依賴
+（numpy、scipy、matplotlib、PyQt5，pip 裝不起來就改用 conda-forge）、
+確認四個真的能 import、把用的直譯器記進 `python-path.txt` 讓啟動器用同一個、
 做編譯檢查、在桌面放一個 pyTECTOR 捷徑。可以重複執行，不會弄壞什麼。
 
-手動的話：Python 3 加上那四個套件（Anaconda 只缺 PyQt5），然後：
+機器上完全沒有 Python 的話，安裝腳本會問要不要代為從 `repo.anaconda.com`
+下載並安裝 Miniconda（約 80 MB，只裝給目前使用者）；回答 `n` 則改開下載頁。
+
+手動的話：Python 3.8 或更新，加上那四個套件（Anaconda 只缺 PyQt5），然後：
 
 ```
 pyTECTOR.bat        雙擊啟動
@@ -344,3 +356,7 @@ print(core.summary(r['T'], site.n, site.s)['sigma1'])
 | 兩種方法答案差很多 | 先看 n 與 Φ：n<7 或 Φ 近 0/1 時本來就會（README 有統計）。差距跨過你的分期界線才需要追 |
 | 想重現舊 run 但差 1° | 確認 INVDIR pass 跟 INFO1 的 (NO k) 一致、archive LAMBDA 有勾 |
 | HPGL 疊不上舊圖 | 用 0.2.0 之後的版本（舊版尺度錯 1/4） |
+| `ModuleNotFoundError: No module named 'PyQt5'` | 啟動器跑的 Python 跟裝套件的那個不是同一個。重跑 `install.bat`（或 `install.command`）：它會把直譯器記進 `python-path.txt`，之後啟動器就用那一個 |
+| 打 `python` 會跳出 Microsoft Store | 那是 Store 樁不是直譯器。裝 Miniconda 後重跑安裝腳本，它會依路徑排除那個樁 |
+| 安裝腳本什麼都裝不起來 | 多半是 proxy 擋 pip，或根本沒網路。有 conda 時它會自己改用 conda-forge，所以先裝 Miniconda 常常就解決了 |
+| 桌面捷徑點了沒反應 | 捷徑指向你跑安裝腳本時那個資料夾裡的 `pyTECTOR.bat`。資料夾搬走或改名就會失效，在新位置重跑一次 `install.bat` 即可 |

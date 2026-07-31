@@ -8,11 +8,18 @@
 #
 # Picks the first interpreter that can actually import PyQt5, so a machine
 # with both a system python and a conda python does not fail on whichever
-# one happens to be first on PATH.
+# one happens to be first on PATH. The one install.command recorded is tried
+# before either, since that is where the dependencies went.
 set -e
 cd "$(dirname "$0")"
 
-for py in "$PYTECTOR_PYTHON" python3 python; do
+recorded=""
+[ -f python-path.txt ] && recorded=$(cat python-path.txt)
+
+for py in "$PYTECTOR_PYTHON" "$recorded" \
+          "$HOME/miniconda3/bin/python3" "$HOME/anaconda3/bin/python3" \
+          "$HOME/miniforge3/bin/python3" /opt/miniconda3/bin/python3 \
+          python3 python; do
     [ -n "$py" ] || continue
     command -v "$py" >/dev/null 2>&1 || continue
     if "$py" -c 'import PyQt5' >/dev/null 2>&1; then
@@ -22,7 +29,8 @@ done
 
 echo "No Python with PyQt5 was found."
 echo
-echo "Install the dependencies first:"
+echo "Run ./install.command in this folder: it installs the four dependencies"
+echo "and records which interpreter to use. Or do it by hand:"
 echo "    python3 -m pip install numpy scipy matplotlib PyQt5"
 echo
 echo "On an Apple Silicon Mac, PyQt5 needs a build with an arm64 wheel"

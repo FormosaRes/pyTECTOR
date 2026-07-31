@@ -13,7 +13,7 @@
 依已發表的方法重建，並以原程式自身的輸出檔案驗證
 
 [![TENSOR](https://img.shields.io/badge/TENSOR%205.45-reconstructed-1f6feb)](docs/mesure_oracle.md)
-[![version](https://img.shields.io/badge/version-0.3.0-brightgreen)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.3.1-brightgreen)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-3.x-555)](#安裝與執行)
 [![tests](https://img.shields.io/badge/tests-11%20suites%20passing-2ea44f)](tests/)
 [![licence](https://img.shields.io/badge/licence-MIT-8250df)](LICENSE)
@@ -100,11 +100,77 @@ INFO1 上自報其名，而橫幅上兩個名稱之一即為 **TECTOR**，亦即
 
 ## 安裝與執行
 
-Windows 一鍵安裝：下載整個 repo 後雙擊 **`install.bat`**。
-該腳本會自動尋找 Python（優先使用 Anaconda）、安裝 numpy／scipy／matplotlib／PyQt5，
-並在桌面建立 pyTECTOR 捷徑。亦可使用
-`pip install .`（或 `pip install git+https://github.com/FormosaRes/pyTECTOR`），
-安裝後會提供 `pytector` 指令。
+### 請先安裝 Anaconda 或 Miniconda
+
+這是強烈建議，各平台皆然。pyTECTOR 在 python.org 的一般安裝上也能正常運作，
+但 conda 可以排除掉大部分安裝失敗的三個原因：
+
+- numpy、scipy、matplotlib 本來就有，或是以預先編譯好的二進位檔提供，
+  不需要現場編譯，網路慢或被過濾時也比較不會裝到一半就卡住；
+- 在 Windows 上可以避開 Microsoft Store 的 `python` 樁：它不是真正的直譯器，
+  PyQt5 在它底下不能用。這是安裝失敗最常見的單一原因；
+- 在 Apple Silicon 的 Mac 上，Qt 會以 arm64 二進位檔提供，
+  而不是讓 pip 從原始碼編譯。
+
+**Miniconda** 是兩者中較小的，而且完全夠用；已經裝了 Anaconda 的話同樣沒問題。
+若是為機構而非個人安裝，請留意 Anaconda Inc. 的套件庫對較大型組織訂有授權條款，
+而 Miniconda 搭配 conda-forge channel 不會有這個問題。
+
+下載頁：<https://www.anaconda.com/download/success>。
+安裝程式自己的預設選項就是對的，不需要系統管理員權限，
+也不需要勾選「Add to PATH」。
+
+### 然後，Windows：一鍵
+
+下載整個 repo（*Code* → *Download ZIP*）、解壓縮，雙擊 **`install.bat`**。
+它會一次把該裝的都裝好：
+
+| 步驟 | |
+|---|---|
+| 尋找直譯器 | 先找 Anaconda 與 Miniconda，再找 `PATH`，最後找 `py` 啟動器。Store 樁會依路徑排除 |
+| 安裝相依套件 | numpy、scipy、matplotlib、PyQt5；pip 裝不起來的部分改用 conda-forge |
+| 確認四個都能 import | 而不是只看 pip 的離開碼 |
+| 記下用的是哪一個 Python | 寫進 `python-path.txt`，讓 `pyTECTOR.bat` 啟動的是同一個，而不是 `PATH` 上的另一個 |
+| 編譯檢查程式 | 並在桌面建立 pyTECTOR 捷徑 |
+
+可以重複執行，也不需要系統管理員權限。
+
+**若機器上完全沒有 Python**，安裝腳本會詢問是否代為從 `repo.anaconda.com`
+下載並安裝 Miniconda：約 80 MB、兩三分鐘、只裝給目前這個使用者。
+回答 `n` 則改為開啟下載頁。它會盡量裝到 `C:\Miniconda3`，
+不行才退回使用者資料夾，因為 conda 與 Qt 在非純 ASCII 的家目錄底下都會出問題，
+而中文或日文的 Windows 帳號正是這種情況。
+
+### macOS 與 Linux：`install.command`
+
+函式庫本身沒有任何 Windows 專屬程式碼，因此反演、檔案讀取與各項匯出均可直接執行。
+**`install.command`** 是 `install.bat` 的對應版本，步驟相同，
+同樣會提供 Miniconda 安裝選項，在 Finder 中可直接雙擊。
+若雙擊沒反應，表示它掉了執行位元：
+
+```
+chmod +x install.command
+./install.command
+```
+
+介面本身尚未在 macOS 上實際測試：字體堆疊已納入 macOS 與 Linux 的字型
+以維持定寬表格的對齊，若發現顯示異常歡迎回報。
+
+### 手動安裝
+
+不想跑安裝腳本的話：Python 3.8 或更新，加上那四個套件。
+`pip install .`（或 `pip install git+https://github.com/FormosaRes/pyTECTOR`）
+亦可，安裝後會提供 `pytector` 指令。
+
+```
+python -m pip install numpy scipy matplotlib PyQt5
+```
+
+在 **Apple Silicon** 的 Mac 上，PyQt5 需使用具備 arm64 wheel 的版本
+（5.15.10 或更新）；若 pip 開始從原始碼編譯 Qt，請改以 conda 安裝：
+`conda install -c conda-forge pyqt`。
+
+### 執行
 
 ```
 pyTECTOR.bat                           桌面介面（Windows）
@@ -114,21 +180,8 @@ python run_batch.py [根目錄] [out.csv] 對整棵資料夾跑兩種方法
 python make_survey.py [根目錄] [輸出夾] 產生表格、地圖點位與各期玫瑰圖
 ```
 
-**macOS 與 Linux。** 函式庫本身沒有任何 Windows 專屬程式碼，
-因此反演、檔案讀取與各項匯出均可直接執行。安裝四個相依套件後，
-使用 `pyTECTOR.command` 啟動（在 Finder 中可直接雙擊）：
-
-```
-python3 -m pip install numpy scipy matplotlib PyQt5
-./pyTECTOR.command
-```
-
-兩點須注意。在 **Apple Silicon** 的 Mac 上，PyQt5 需使用具備 arm64 wheel 的版本
-（5.15.10 或更新）；若 pip 開始從原始碼編譯 Qt，請改以 conda 安裝
-（`conda install -c conda-forge pyqt`）。另外，若需指定特定的 Python 解譯器，
-可設定 `PYTECTOR_PYTHON`，否則啟動器會採用 `PATH` 上第一個能匯入 PyQt5 的解譯器。
-介面尚未在 macOS 上實際測試：字體堆疊已納入 macOS 與 Linux 的字型以維持
-定寬表格的對齊，若發現顯示異常歡迎回報。
+兩個啟動器都會使用安裝腳本記下的那個直譯器。
+若要自己指定，設定 `PYTECTOR_PYTHON` 即可，它的優先序高於其他一切。
 
 逐項功能的完整操作說明見 **[docs/manual.zh.md](docs/manual.zh.md)**。
 

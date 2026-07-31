@@ -13,6 +13,11 @@ demo_*.txt
 /MOHR1
 *.jpg
 
+# written by install.bat and install.command: the interpreter the dependencies
+# went into, so the launchers start that one rather than whatever is first on
+# PATH. Machine-specific, not source.
+python-path.txt
+
 # build debris
 *.egg-info/
 build/
@@ -40,6 +45,14 @@ Session/*
 # they are field data in all but format. Three of them had been committed and
 # had to be removed from history before this repository could be made public;
 # the patterns are here so it cannot happen again.
+# The working data folder: where old-format TENSOR runs get dropped in for the
+# survey window to read, together with the coordinate and phase files that go
+# with them. All of it is unpublished field data and station positions. The
+# whole tree is ignored, README included, because the only safe rule for a
+# folder whose entire purpose is to hold field data is that nothing inside it
+# is ever tracked.
+py_data/
+
 audit_log.txt
 repro_log.txt
 tilt_out.txt

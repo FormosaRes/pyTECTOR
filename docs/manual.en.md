@@ -25,13 +25,27 @@ The method itself (the criterion, the two runs, λ, equivariance) lives in the
 
 ## 1. Install and start
 
-**One click**: double-click **`install.bat`** in the repository root. It finds
-a Python (Anaconda first), installs the four dependencies (numpy, scipy,
-matplotlib, PyQt5), runs a compile check, and puts a pyTECTOR shortcut on the
-desktop. Safe to run twice.
+**Install Anaconda or Miniconda first.** Strongly recommended on every
+platform: it avoids the Microsoft Store `python` stub, which PyQt5 does not
+work under and which is the most common reason a setup fails, and it supplies
+scipy and Qt as prebuilt binaries so nothing has to be compiled. Miniconda is
+enough. <https://www.anaconda.com/download/success>, default answers, no
+administrator rights needed, no need to tick "Add to PATH".
 
-Manually: Python 3 plus those four packages (an Anaconda install lacks only
-PyQt5), then:
+**One click**: double-click **`install.bat`** in the repository root, or run
+**`install.command`** on macOS and Linux. Either one finds a Python (Anaconda
+and Miniconda first, the Store stub excluded), installs the four dependencies
+(numpy, scipy, matplotlib, PyQt5) with conda-forge as the fallback, checks that
+all four actually import, records the interpreter in `python-path.txt` so the
+launcher starts that same one, compile-checks the program, and puts a pyTECTOR
+shortcut on the desktop. Safe to run twice.
+
+If the machine has no Python at all, the installer offers to download Miniconda
+from `repo.anaconda.com` and install it for this user, about 80 MB. Answering
+`n` opens the download page instead.
+
+Manually: Python 3.8 or newer plus those four packages (an Anaconda install
+lacks only PyQt5), then:
 
 ```
 pyTECTOR.bat        double-click
@@ -391,3 +405,7 @@ print(core.summary(r['T'], site.n, site.s)['sigma1'])
 | the two methods disagree a lot | check n and Φ first: below n = 7 or with Φ near 0/1 that is expected (statistics in the README). Chase it only if the gap crosses one of your stage boundaries |
 | an old run reproduces 1° off | make sure INVDIR pass matches the INFO1's (NO k) and archive LAMBDA is ticked |
 | exported HPGL does not overlay an old plot | use 0.2.0 or later (earlier exports were a quarter too large) |
+| `ModuleNotFoundError: No module named 'PyQt5'` | the launcher started a different Python from the one the dependencies went into. Run `install.bat` (or `install.command`) again: it records the interpreter in `python-path.txt` and the launcher then uses that one |
+| typing `python` opens the Microsoft Store | that is the Store stub, not an interpreter. Install Miniconda and run the installer again; it excludes the stub by path |
+| the installer cannot install anything | usually a proxy blocking pip, or no network. With conda present it falls back to conda-forge on its own, so installing Miniconda first often clears it |
+| the desktop shortcut does nothing | it points at `pyTECTOR.bat` in the folder you ran the installer from. Moving or renaming that folder breaks it; run `install.bat` again from the new location |

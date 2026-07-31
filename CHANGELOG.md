@@ -8,6 +8,27 @@ Back to the [README](../README.md) · 回到 [README](../README.md)。
 
 ## English
 
+**0.3.1**
+
+- **the one-click setup now actually installs everything.** `install.bat`
+  offers to download and install Miniconda when the machine has no Python at
+  all, falls back to conda-forge for anything pip cannot supply, and verifies
+  that numpy, scipy, matplotlib and PyQt5 really import rather than trusting
+  pip's exit code
+- it excludes the **Microsoft Store `python` stub** by path. That stub is not a
+  real interpreter, PyQt5 does not work under it, and it was the most common
+  way the setup failed
+- the interpreter it used is recorded in `python-path.txt`, and `pyTECTOR.bat`
+  and `pyTECTOR.command` start **that** one. Previously the installer could put
+  the dependencies into one Python while the launcher started another
+- **`install.command`**, the macOS and Linux counterpart of `install.bat`, with
+  the same steps and the same Miniconda offer
+- the automatic Miniconda install goes to `C:\Miniconda3` where it can, because
+  conda and Qt both misbehave under a home directory whose name is not plain
+  ASCII, which is the normal case on a Chinese or Japanese Windows account
+- the README and both manuals recommend Anaconda or Miniconda up front, and say
+  why
+
 **0.3.0**
 
 - **released under the MIT Licence**, which settles the one item that had been
@@ -49,6 +70,23 @@ Back to the [README](../README.md) · 回到 [README](../README.md)。
 - desktop interface, 1991 mode
 
 ## 中文
+
+**0.3.1**
+
+- **一鍵安裝真的把該裝的都裝好了。** 機器上完全沒有 Python 時，
+  `install.bat` 會詢問是否代為下載並安裝 Miniconda；pip 裝不起來的部分改用
+  conda-forge；並且實際確認 numpy、scipy、matplotlib、PyQt5 都能 import，
+  而不是只看 pip 的離開碼
+- 依路徑排除 **Microsoft Store 的 `python` 樁**。它不是真正的直譯器，
+  PyQt5 在它底下不能用，這是先前安裝失敗最常見的原因
+- 用到的直譯器會記進 `python-path.txt`，`pyTECTOR.bat` 與 `pyTECTOR.command`
+  啟動的就是**那一個**。先前安裝腳本可能把套件裝進某個 Python，
+  啟動器卻跑了另一個
+- 新增 **`install.command`**，`install.bat` 的 macOS 與 Linux 對應版本，
+  步驟相同，同樣提供 Miniconda 安裝選項
+- 自動安裝 Miniconda 時盡量裝到 `C:\Miniconda3`，因為 conda 與 Qt
+  在非純 ASCII 的家目錄底下都會出問題，而中文或日文的 Windows 帳號正是如此
+- README 與兩份手冊都改為在最前面建議安裝 Anaconda 或 Miniconda，並說明原因
 
 **0.3.0**
 

@@ -1,0 +1,15 @@
+# Line endings for the launchers and installers, stated rather than left to
+# whatever core.autocrlf happens to be on the machine that commits.
+#
+# A .command or .sh file with CRLF endings fails on macOS with
+#   bad interpreter: /bin/sh^M
+# and a .bat file is the opposite case: cmd.exe can mis-handle goto and labels
+# in a file that has only LF.
+#
+# The catch-all comes first on purpose: within a .gitattributes the last
+# matching pattern wins, so the specific rules must follow it, not precede it.
+*          text=auto
+
+*.command  text eol=lf
+*.sh       text eol=lf
+*.bat      text eol=crlf

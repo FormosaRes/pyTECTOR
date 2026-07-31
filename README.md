@@ -13,7 +13,7 @@
 Rebuilt from the published method, and checked against the original program's own output
 
 [![TENSOR](https://img.shields.io/badge/TENSOR%205.45-reconstructed-1f6feb)](docs/mesure_oracle.md)
-[![version](https://img.shields.io/badge/version-0.3.0-brightgreen)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-0.3.1-brightgreen)](pyproject.toml)
 [![python](https://img.shields.io/badge/python-3.x-555)](#quick-start)
 [![tests](https://img.shields.io/badge/tests-11%20suites%20passing-2ea44f)](tests/)
 [![licence](https://img.shields.io/badge/licence-MIT-8250df)](LICENSE)
@@ -117,11 +117,87 @@ Both questions in full, with the banner text and the references:
 
 ## Quick start
 
-One-click on Windows: download the repository, double-click **`install.bat`**.
-It finds a Python (Anaconda first), installs numpy, scipy, matplotlib and
-PyQt5, and puts a pyTECTOR shortcut on the desktop. Alternatively
-`pip install .` (or `pip install git+https://github.com/FormosaRes/pyTECTOR`)
+### Install Anaconda or Miniconda first
+
+This is a strong recommendation, on every platform. pyTECTOR runs perfectly
+well on a plain python.org install, but conda removes the three things that
+account for most failed setups:
+
+- numpy, scipy and matplotlib are already present, or arrive as prebuilt
+  binaries, so nothing has to be compiled and a slow or filtered network is far
+  less likely to leave you with half an install;
+- on Windows it sidesteps the Microsoft Store `python` stub, which is not a
+  real interpreter and which PyQt5 does not work under. This is the single most
+  common way the setup fails;
+- on an Apple Silicon Mac it supplies Qt as an arm64 binary rather than letting
+  pip try to compile it from source.
+
+**Miniconda** is the smaller of the two and is entirely enough; Anaconda is
+equally fine if you already have it. If you are setting this up for an
+institution rather than for yourself, note that Anaconda Inc.'s package
+repository carries licence terms for larger organisations, which Miniconda used
+against the conda-forge channel does not raise.
+
+Download page: <https://www.anaconda.com/download/success>. The installer's own
+default answers are the right ones. You do not need administrator rights, and
+you do not need to tick "Add to PATH".
+
+### Then, on Windows: one click
+
+Download the repository (*Code* → *Download ZIP*), unpack it, and double-click
+**`install.bat`**. It does the whole setup in one pass:
+
+| step | |
+|---|---|
+| finds an interpreter | Anaconda and Miniconda first, then `PATH`, then the `py` launcher. The Store stub is excluded by path |
+| installs the dependencies | numpy, scipy, matplotlib and PyQt5, with conda-forge as the fallback for anything pip cannot supply |
+| checks that all four import | rather than trusting pip's exit code |
+| records which Python it used | in `python-path.txt`, so `pyTECTOR.bat` starts that interpreter and not some other one on `PATH` |
+| compile-checks the program | and puts a pyTECTOR shortcut on the desktop |
+
+Safe to run twice, and it needs no administrator rights.
+
+**If the machine has no Python at all**, the installer offers to fetch
+Miniconda from `repo.anaconda.com` and install it for you: about 80 MB, a
+couple of minutes, this user only. Answer `n` and it opens the download page
+instead. It installs into `C:\Miniconda3` where it is allowed to, and falls
+back to your user folder otherwise, because conda and Qt both misbehave under a
+home directory whose name is not plain ASCII, which is the normal case on a
+Chinese or Japanese Windows account.
+
+### macOS and Linux: `install.command`
+
+Nothing in the library is Windows-specific, so the inversion, the file readers
+and the exports all run unchanged. **`install.command`** is the counterpart of
+`install.bat`, with the same steps and the same Miniconda offer, and is
+double-clickable in Finder. If double-clicking does nothing it has lost its
+execute bit:
+
+```
+chmod +x install.command
+./install.command
+```
+
+The interface itself has not been tested on macOS: the font stacks name macOS
+and Linux faces so the fixed-width tables stay aligned, but reports of anything
+that looks wrong are welcome.
+
+### By hand
+
+Python 3.8 or newer plus the four packages, if you would rather not run either
+installer. `pip install .`, or
+`pip install git+https://github.com/FormosaRes/pyTECTOR`, also works and
 installs a `pytector` command.
+
+```
+python -m pip install numpy scipy matplotlib PyQt5
+```
+
+On an **Apple Silicon** Mac, PyQt5 needs a release with an arm64 wheel (5.15.10
+or newer); if pip starts compiling Qt from source, install it through conda
+instead: `conda install -c conda-forge pyqt`.
+
+### Running it
 
 ```
 pyTECTOR.bat                           desktop interface (Windows)
@@ -131,22 +207,9 @@ python run_batch.py [root] [out.csv]   both runs over a whole folder tree
 python make_survey.py [root] [outdir]  table, map data and a rose per phase
 ```
 
-**macOS and Linux.** Nothing in the library is Windows-specific, so the
-inversion, the file readers and the exports all run unchanged. Install the four
-dependencies and use `pyTECTOR.command`, which is double-clickable in Finder:
-
-```
-python3 -m pip install numpy scipy matplotlib PyQt5
-./pyTECTOR.command
-```
-
-Two things to know. On an **Apple Silicon** Mac, PyQt5 needs a release with an
-arm64 wheel (5.15.10 or newer); if pip starts compiling Qt from source, install
-it through conda instead (`conda install -c conda-forge pyqt`). And set
-`PYTECTOR_PYTHON` if the launcher should use a particular interpreter rather
-than the first one on `PATH` that can import PyQt5. The interface has not been
-tested on macOS: the font stacks name macOS and Linux faces so the fixed-width
-tables stay aligned, but reports of anything that looks wrong are welcome.
+Both launchers start the interpreter the installer recorded. Set
+`PYTECTOR_PYTHON` to override that and name a particular interpreter yourself;
+it takes precedence over everything else.
 
 The full interface walkthrough, control by control, is in
 **[docs/manual.en.md](docs/manual.en.md)**.

@@ -109,9 +109,15 @@ def _tm_inverse(east, north, lon0, k0, fe, fn):
     return math.degrees(lon) + lon0, math.degrees(lat)
 
 
-def to_merc(x, y, epsg):
-    """Any supported CRS to Web Mercator metres."""
-    epsg = int(epsg)
+def to_merc(x, y, crs):
+    """Any supported CRS to Web Mercator metres.
+
+    crs is either an EPSG number or a (lon0, k0, false E, false N) tuple for
+    a transverse Mercator spelled out rather than named.
+    """
+    if isinstance(crs, (tuple, list)):
+        return lonlat_to_merc(*_tm_inverse(x, y, *crs))
+    epsg = int(crs)
     if epsg == 3857:
         return float(x), float(y)
     if epsg == 4326:
@@ -249,31 +255,116 @@ _TAG_PIXEL_SCALE = 33550
 _TAG_TIEPOINT = 33922
 _TAG_TRANSFORM = 34264
 _TAG_GEOKEYS = 34735
-#: GeoKey ids for the projected and the geographic CRS
-_KEY_PROJECTED = 3072
+_TAG_GEODOUBLES = 34736
+#: GeoKey ids
+_KEY_MODEL = 1024             # 1 projected, 2 geographic
 _KEY_GEOGRAPHIC = 2048
+_KEY_PROJECTED = 3072
+_KEY_COORD_TRANS = 3075       # 1 = transverse Mercator
+_KEY_NAT_ORIGIN_LONG = 3080
+_KEY_FALSE_EASTING = 3082
+_KEY_FALSE_NORTHING = 3083
+_KEY_CENTER_LONG = 3088
+_KEY_SCALE_AT_NAT_ORIGIN = 3092
+#: what a GeoTIFF writes when the projection is spelled out rather than named
+USER_DEFINED = 32767
+#: ProjCoordTransGeoKey value for transverse Mercator
+_CT_TM = 1
 
 
 def _geokeys(tags):
-    """{key id: value} out of the GeoKeyDirectory, ints only.
+    """{key id: value} out of the GeoKeyDirectory.
 
-    The directory is a flat list of 4-tuples after a 4-value header. Entries
-    whose location field is non-zero point into other tags for a string or a
-    double; those are not needed here and are skipped.
+    The directory is a flat list of 4-tuples after a 4-value header. An entry
+    whose location field is 0 carries its value inline; one pointing at 34736
+    indexes into the GeoDoubleParams array, which is where the projection
+    parameters live. Reading only the inline ones was enough while every file
+    named a standard EPSG, and stopped being enough the moment one arrived
+    with EPSG 32767, "user-defined": for those the code IS the doubles.
     """
     raw = tags.get(_TAG_GEOKEYS)
     if not raw or len(raw) < 8:
         return {}
+    doubles = tags.get(_TAG_GEODOUBLES) or []
     out = {}
     for i in range(4, len(raw) - 3, 4):
-        key, loc, count, value = raw[i:i + 4]
+        key, loc, count, value = (int(v) for v in raw[i:i + 4])
         if loc == 0 and count == 1:
-            out[int(key)] = int(value)
+            out[key] = value
+        elif loc == _TAG_GEODOUBLES and count == 1 and value < len(doubles):
+            out[key] = float(doubles[value])
     return out
 
 
-def read_geotiff(path, max_px=2400):
-    """A north-up GeoTIFF as (image, extent_in_mercator, epsg).
+def _tm_from_geokeys(gk):
+    """(lon0, k0, false easting, false northing) for a user-defined TM.
+
+    Returns None when the file does not spell out a transverse Mercator. The
+    parameters are taken as written rather than matched to a known grid: a
+    file that says central meridian 121, scale 0.9999, false easting 250000
+    is TWD97 TM2 whether or not it says so, and one that says something else
+    is something else and must be treated as such.
+    """
+    if gk.get(_KEY_COORD_TRANS) != _CT_TM:
+        return None
+    lon0 = gk.get(_KEY_NAT_ORIGIN_LONG, gk.get(_KEY_CENTER_LONG))
+    if lon0 is None:
+        return None
+    return (float(lon0), float(gk.get(_KEY_SCALE_AT_NAT_ORIGIN, 1.0)),
+            float(gk.get(_KEY_FALSE_EASTING, 0.0)),
+            float(gk.get(_KEY_FALSE_NORTHING, 0.0)))
+
+
+def _resolve_crs(gk, sx, left, force=None):
+    """Work out the raster's CRS, or say plainly why it cannot be.
+
+    Order matters. An explicit choice by the user wins, because they can read
+    the file's own metadata and this cannot. Then a standard EPSG code. Then
+    a user-defined projection spelled out in the GeoKeys, which is what
+    EPSG 32767 means and what Taiwanese exports very often carry. Only after
+    all of those does it fall back to guessing, and it guesses only the one
+    case that cannot be anything else.
+    """
+    if force is not None:
+        return force, ('EPSG:%s (chosen)' % force
+                       if not isinstance(force, (tuple, list))
+                       else 'TM lon0=%g k0=%g (chosen)' % (force[0], force[1]))
+
+    epsg = gk.get(_KEY_PROJECTED) or gk.get(_KEY_GEOGRAPHIC)
+    if epsg and int(epsg) != USER_DEFINED:
+        epsg = int(epsg)
+        if epsg in (4326, 3857) or epsg in _TM:
+            return epsg, 'EPSG:%d' % epsg
+        raise ValueError(
+            'CRS EPSG:%d is not one this reader knows.\n\nSupported: %s.\n\n'
+            'Either reproject the raster to one of those in QGIS, or choose '
+            'the projection by hand in the next dialog.' % (epsg, SUPPORTED))
+
+    tm = _tm_from_geokeys(gk)
+    if tm:
+        lon0, k0, fe, fn = tm
+        for code, params in _TM.items():
+            if (abs(params[0] - lon0) < 1e-6 and abs(params[1] - k0) < 1e-9
+                    and abs(params[2] - fe) < 1e-3):
+                return code, 'EPSG:%d (spelled out in the file)' % code
+        return tm, ('transverse Mercator, lon0 %g, k0 %g, FE %g'
+                    % (lon0, k0, fe))
+
+    if gk.get(_KEY_MODEL) == 2 or (sx < 0.01 and abs(left) <= 180):
+        return 4326, 'longitude and latitude'
+
+    raise ValueError(
+        'this TIFF does not say what projection it is in, and the numbers in '
+        'it do not settle the question.\n\nKnown: %s.\n\nChoose the '
+        'projection by hand in the next dialog, or assign one in QGIS and '
+        'export again.' % SUPPORTED)
+
+
+def read_geotiff(path, max_px=2400, force=None):
+    """A north-up GeoTIFF as (image, extent_in_mercator, label).
+
+    force overrides the file's own idea of its CRS: an EPSG number, or a
+    (lon0, k0, false E, false N) tuple for a transverse Mercator.
 
     extent is (left, right, bottom, top) in Web Mercator metres, ready for
     imshow on the same axes as the basemap.
@@ -309,21 +400,7 @@ def read_geotiff(path, max_px=2400):
             'with a tie point nor a model transform. A plain TIFF cannot be '
             'placed on a map.')
 
-    gk = _geokeys(tags)
-    epsg = gk.get(_KEY_PROJECTED) or gk.get(_KEY_GEOGRAPHIC)
-    if not epsg:
-        # A file with metre-sized pixels is projected; degrees-sized is not.
-        # Guessing between grids would be reckless, so only the geographic
-        # case is assumed, and only when the numbers can be nothing else.
-        if sx < 0.01 and abs(left) <= 180:
-            epsg = 4326
-        else:
-            raise ValueError(
-                'this TIFF carries no CRS. Supported: %s. Assign one in QGIS '
-                'and export again.' % SUPPORTED)
-    if int(epsg) not in (4326, 3857) and int(epsg) not in _TM:
-        raise ValueError('CRS EPSG:%d is not supported. Supported: %s.'
-                         % (int(epsg), SUPPORTED))
+    crs, label = _resolve_crs(_geokeys(tags), sx, left, force)
 
     w, h = im.size
     step = max(1, int(math.ceil(max(w, h) / float(max_px))))
@@ -337,7 +414,7 @@ def read_geotiff(path, max_px=2400):
     # north-up here, so the box maps to a box closely enough for a backdrop
     xs, ys = [], []
     for cx, cy in ((left, bottom), (right, bottom), (left, top), (right, top)):
-        mx, my = to_merc(cx, cy, epsg)
+        mx, my = to_merc(cx, cy, crs)
         xs.append(mx)
         ys.append(my)
-    return arr, (min(xs), max(xs), min(ys), max(ys)), int(epsg)
+    return arr, (min(xs), max(xs), min(ys), max(ys)), label

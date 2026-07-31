@@ -26,7 +26,6 @@ import os
 from PyQt5 import QtCore, QtWidgets
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavBar
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 
@@ -126,16 +125,102 @@ class MapPanel(QtWidgets.QWidget):
         row.addStretch(1)
         lay.addLayout(row)
 
+        b = QtWidgets.QPushButton('Save image...')
+        b.setToolTip('Write the map as it stands to a PNG')
+        b.clicked.connect(self.save_png)
+        row.addWidget(b)
+
         self.fig = Figure(figsize=(6, 7))
         self.canvas = Canvas(self.fig)
-        self.ax = self.fig.add_subplot(111)
-        lay.addWidget(NavBar(self.canvas, self))
+        # The axes fill the figure. A map does not want a title, tick labels
+        # or a margin, and the default subplot padding was drawing four white
+        # bands around it.
+        self.ax = self.fig.add_axes([0, 0, 1, 1])
+        self.canvas.setCursor(QtCore.Qt.OpenHandCursor)
         lay.addWidget(self.canvas, 1)
+
+        # Wheel to zoom, drag to pan. The matplotlib navigation bar was here
+        # and has gone: home / back / forward / subplots / customise are not
+        # what a map wants, and the two things it does want were behind modal
+        # buttons that had to be turned on and off again.
+        self.canvas.mpl_connect('scroll_event', self._on_scroll)
+        self.canvas.mpl_connect('button_press_event', self._on_press)
+        self.canvas.mpl_connect('motion_notify_event', self._on_motion)
+        self.canvas.mpl_connect('button_release_event', self._on_release)
+        self._drag = None
+        self._tile_timer = QtCore.QTimer(self)
+        self._tile_timer.setSingleShot(True)
+        self._tile_timer.setInterval(320)
+        self._tile_timer.timeout.connect(self._refresh_tiles)
 
         self.lbl = QtWidgets.QLabel('')
         self.lbl.setObjectName('legend')
         self.lbl.setWordWrap(True)
         lay.addWidget(self.lbl)
+
+    # ----------------------------------------------------------- gestures --
+    def _on_scroll(self, ev):
+        if ev.inaxes is not self.ax or ev.xdata is None:
+            return
+        f = 0.8 if ev.button == 'up' else 1.25
+        x0, x1 = self.ax.get_xlim()
+        y0, y1 = self.ax.get_ylim()
+        # keep the point under the cursor where it is, which is what makes
+        # wheel zoom feel like a map rather than like a plot
+        self.ax.set_xlim(ev.xdata + (x0 - ev.xdata) * f,
+                         ev.xdata + (x1 - ev.xdata) * f)
+        self.ax.set_ylim(ev.ydata + (y0 - ev.ydata) * f,
+                         ev.ydata + (y1 - ev.ydata) * f)
+        self._after_gesture()
+
+    def _on_press(self, ev):
+        if ev.inaxes is not self.ax or ev.button != 1 or ev.xdata is None:
+            return
+        self._drag = (ev.xdata, ev.ydata,
+                      self.ax.get_xlim(), self.ax.get_ylim())
+        self.canvas.setCursor(QtCore.Qt.ClosedHandCursor)
+
+    def _on_motion(self, ev):
+        if not self._drag or ev.x is None:
+            return
+        # work in pixels: the data coordinate under the cursor moves as the
+        # limits move, so using ev.xdata here makes the map slide away
+        x0, y0, xlim, ylim = self._drag
+        inv = self.ax.transData.inverted()
+        try:
+            cx, cy = inv.transform((ev.x, ev.y))
+        except Exception:
+            return
+        dx, dy = x0 - cx, y0 - cy
+        self.ax.set_xlim(xlim[0] + dx, xlim[1] + dx)
+        self.ax.set_ylim(ylim[0] + dy, ylim[1] + dy)
+        self.canvas.draw_idle()
+
+    def _on_release(self, ev):
+        if not self._drag:
+            return
+        self._drag = None
+        self.canvas.setCursor(QtCore.Qt.OpenHandCursor)
+        self._after_gesture()
+
+    def _after_gesture(self):
+        """Redraw now, refetch tiles once the gesture has settled.
+
+        Tiles are the slow part and a wheel is a stream of events, so the
+        picture follows the hand immediately and the background catches up.
+        """
+        self.canvas.draw_idle()
+        self._tile_timer.start()
+
+    def _refresh_tiles(self):
+        self.redraw(refetch=True)
+
+    def save_png(self):
+        p, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, 'Save the map', 'stress_map.png', 'PNG (*.png)')
+        if p:
+            self.fig.savefig(p, dpi=220, facecolor='white')
+            self.lbl.setText('written to %s' % p)
 
     # ------------------------------------------------------------- layers --
     def load_tif(self):
@@ -145,16 +230,47 @@ class MapPanel(QtWidgets.QWidget):
             'GeoTIFF (*.tif *.tiff);;All (*)')
         if not p:
             return
-        try:
-            img, ext, epsg = basemap.read_geotiff(p)
-        except Exception as exc:
-            QtWidgets.QMessageBox.warning(
-                self, 'pyTECTOR',
-                'Could not place this raster.\n\n%s' % exc)
-            return
-        self.tif = (img, ext, epsg, p)
+        force = None
+        while True:
+            try:
+                img, ext, label = basemap.read_geotiff(p, force=force)
+                break
+            except Exception as exc:
+                # Offer the choice rather than just refusing. The file's own
+                # metadata is often the only thing missing, and the user can
+                # read it in QGIS when this cannot.
+                force = self._ask_crs(str(exc))
+                if force is None:
+                    return
+        self.tif = (img, ext, label, p)
         self.btn_clear_tif.setEnabled(True)
         self.redraw(refit=True, refetch=True)
+
+    #: what the manual chooser offers, label -> crs for basemap.to_merc
+    CRS_CHOICES = [
+        ('TWD97 / TM2 zone 121  (EPSG:3826)', 3826),
+        ('UTM zone 51N, WGS84  (EPSG:32651)', 32651),
+        ('Longitude / latitude, WGS84  (EPSG:4326)', 4326),
+        ('Web Mercator  (EPSG:3857)', 3857),
+        ('TWD67 / TM2 zone 121', (121.0, 0.9999, 250000.0, 0.0)),
+    ]
+
+    def _ask_crs(self, why):
+        box = QtWidgets.QMessageBox(self)
+        box.setWindowTitle('pyTECTOR')
+        box.setIcon(QtWidgets.QMessageBox.Question)
+        box.setText('This raster cannot be placed from what it says about '
+                    'itself.')
+        box.setInformativeText('%s\n\nChoose the projection it is in, if you '
+                               'know it.' % why)
+        combo = QtWidgets.QComboBox()
+        combo.addItems([c[0] for c in self.CRS_CHOICES])
+        box.layout().addWidget(combo, 1, 1)
+        box.setStandardButtons(QtWidgets.QMessageBox.Ok
+                               | QtWidgets.QMessageBox.Cancel)
+        if box.exec_() != QtWidgets.QMessageBox.Ok:
+            return None
+        return self.CRS_CHOICES[combo.currentIndex()][1]
 
     def clear_tif(self):
         self.tif = None
@@ -165,6 +281,27 @@ class MapPanel(QtWidgets.QWidget):
     def set_records(self, recs):
         self.recs = recs
         self.redraw(refit=True, refetch=True)
+
+    def _fill(self, box):
+        """Grow a box to the canvas's own shape.
+
+        A map has to be at equal aspect or the axes come out at the wrong
+        angles, and an equal-aspect axes whose limits are a different shape
+        from the widget gets letterboxed: white bands down both sides, which
+        is what this panel was doing. Widening the view instead of shrinking
+        it means nothing that was visible disappears.
+        """
+        x0, x1, y0, y1 = box
+        w, h = max(1.0, self.canvas.width()), max(1.0, self.canvas.height())
+        want = w / h
+        dx, dy = x1 - x0, y1 - y0
+        if dy <= 0 or dx <= 0:
+            return box
+        if dx / dy < want:
+            grow = (dy * want - dx) / 2.0
+            return x0 - grow, x1 + grow, y0, y1
+        grow = (dx / want - dy) / 2.0
+        return x0, x1, y0 - grow, y1 + grow
 
     def _placed(self):
         out = []
@@ -221,29 +358,36 @@ class MapPanel(QtWidgets.QWidget):
             mx, my = basemap.lonlat_to_merc(lon, lat)
             xs.append(mx)
             ys.append(my)
-        pad = max(1500.0, 0.18 * max(max(xs) - min(xs), max(ys) - min(ys)))
-        box = (min(xs) - pad, max(xs) + pad, min(ys) - pad, max(ys) + pad)
+        pad = max(1500.0, 0.12 * max(max(xs) - min(xs), max(ys) - min(ys)))
+        box = self._fill((min(xs) - pad, max(xs) + pad,
+                          min(ys) - pad, max(ys) + pad))
+
+        # What will actually be on screen. After a pan or a zoom that is the
+        # kept limits, not the extent of the data, and both the tiles and the
+        # symbol length have to follow it or the background stays behind.
+        if keep and not refit:
+            view = (keep[0][0], keep[0][1], keep[1][0], keep[1][1])
+        else:
+            view = box
 
         if self.chk_base.isChecked():
-            if refetch or self._basemap_box != box:
-                w, s = basemap.merc_to_lonlat(box[0], box[2])
-                e, n = basemap.merc_to_lonlat(box[1], box[3])
-                self._basemap = basemap.basemap(w, s, e, n)
-                self._basemap_box = box
+            if refetch or self._basemap_box != view:
+                w, s = basemap.merc_to_lonlat(view[0], view[2])
+                e, n = basemap.merc_to_lonlat(view[1], view[3])
+                px = max(400, self.canvas.width())
+                self._basemap = basemap.basemap(w, s, e, n, px=px)
+                self._basemap_box = view
             img, ext = self._basemap or (None, None)
             if img is not None:
                 self.ax.imshow(img, extent=ext, origin='upper', zorder=0,
                                interpolation='bilinear')
 
         if self.tif:
-            img, ext, _epsg, _p = self.tif
+            img, ext, _label, _p = self.tif
             self.ax.imshow(img, extent=ext, origin='upper', zorder=1,
                            alpha=self.sl_alpha.value() / 100.0,
                            interpolation='bilinear')
 
-        # The symbol length follows the view that is about to be shown, not
-        # the one being replaced, so a Fit and a zoom both land right.
-        view = keep[0] if (keep and not refit) else (box[0], box[1])
         half = (view[1] - view[0]) * HALF_FRAC * LENGTH_STEPS[
             self.cmb_len.currentText()]
 
@@ -293,11 +437,8 @@ class MapPanel(QtWidgets.QWidget):
                                   lw=1.9,
                                   label='%s  (%d)' % (phase, len(items))))
 
-        self.ax.set_xlim(box[0], box[1])
-        self.ax.set_ylim(box[2], box[3])
-        if keep and not refit:
-            self.ax.set_xlim(*keep[0])
-            self.ax.set_ylim(*keep[1])
+        self.ax.set_xlim(view[0], view[1])
+        self.ax.set_ylim(view[2], view[3])
         self.ax.set_aspect('equal')
         self.ax.set_xticks([])
         self.ax.set_yticks([])
@@ -306,7 +447,8 @@ class MapPanel(QtWidgets.QWidget):
         if handles:
             self.ax.legend(handles=handles, loc='upper left', fontsize=7.5,
                            framealpha=0.9, borderpad=0.5)
-        self.fig.tight_layout(pad=0.6)
+        # no tight_layout: the axes already fill the figure, and calling it
+        # would put the margins back
         self.canvas.draw_idle()
 
         bits = ['%d station(s) placed' % len(placed),
@@ -314,7 +456,7 @@ class MapPanel(QtWidgets.QWidget):
         if steep:
             bits.append('%d too steep to draw' % steep)
         if self.tif:
-            bits.append('GeoTIFF EPSG:%d  %s'
+            bits.append('GeoTIFF %s  %s'
                         % (self.tif[2], os.path.basename(self.tif[3])))
         if self.chk_base.isChecked() and self._basemap and \
                 self._basemap[0] is None:
